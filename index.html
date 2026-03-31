@@ -415,11 +415,15 @@
                 <input type="text" id="geo-lng" placeholder="Longitudine (es. 9.1900)" />
                 <input type="number" id="geo-radius-entry" min="10" step="5" placeholder="Raggio Ingresso (metri)" />
                 <input type="number" id="geo-radius-exit" min="10" step="5" placeholder="Raggio Uscita (metri)" />
+                <input type="number" id="geo-max-accuracy" min="5" step="1" placeholder="Precisione GPS max accettata (metri)" />
+                <input type="password" id="geo-google-maps-key" placeholder="Google Maps API Key" />
             </div>
             <div id="geo-address-suggestions" style="margin-top: 8px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; max-height: 180px; overflow-y: auto; display: none;"></div>
             <div id="geo-map-preview" style="margin-top: 10px; height: 260px; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; background: #f3f4f6;"></div>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <button type="button" id="geo-use-current-position-btn" style="background-color: #059669; color: white; flex: 1;">Usa Posizione Attuale</button>
+                <button type="button" id="geo-draw-polygon-btn" style="background-color: #0ea5e9; color: white; flex: 1;">Disegna Area</button>
+                <button type="button" id="geo-clear-polygon-btn" style="background-color: #ef4444; color: white; flex: 1;">Cancella Area</button>
                 <button type="button" id="geo-save-settings-btn" style="background-color: #7c3aed; color: white; flex: 1;">Salva Impostazioni Geofence</button>
             </div>
             <p id="geo-admin-status" style="font-size: 0.875rem; color: #4b5563; margin-top: 8px;">Impostazioni geofence non ancora salvate.</p>
@@ -581,8 +585,12 @@
         const geoLngInput = document.getElementById("geo-lng");
         const geoRadiusEntryInput = document.getElementById("geo-radius-entry");
         const geoRadiusExitInput = document.getElementById("geo-radius-exit");
+        const geoMaxAccuracyInput = document.getElementById("geo-max-accuracy");
+        const geoGoogleMapsKeyInput = document.getElementById("geo-google-maps-key");
         const geoGeocodeBtn = document.getElementById("geo-geocode-btn");
         const geoUseCurrentPositionBtn = document.getElementById("geo-use-current-position-btn");
+        const geoDrawPolygonBtn = document.getElementById("geo-draw-polygon-btn");
+        const geoClearPolygonBtn = document.getElementById("geo-clear-polygon-btn");
         const geoSaveSettingsBtn = document.getElementById("geo-save-settings-btn");
         const geoAdminStatusEl = document.getElementById("geo-admin-status");
         const geoAddressSuggestionsEl = document.getElementById("geo-address-suggestions");
@@ -625,6 +633,10 @@
         let googleMarker = null;
         let googleCircleEntry = null;
         let googleCircleExit = null;
+        let googlePolygon = null;
+        let googleMapClickListener = null;
+        let isPolygonDrawMode = false;
+        let lastAutoPunchAt = 0;
         let googlePlacesService = null;
         let googleAutocompleteService = null;
         let addressTypingDebounce = null;
@@ -637,9 +649,11 @@
             centerLng: 0,
             radiusEntryMeters: 120,
             radiusExitMeters: 120,
+            maxAccuracyMeters: 60,
+            polygonPath: [],
+            googleMapsApiKey: "",
         };
         const GEOFENCE_STORAGE_KEY = "badgeapp-geofence-config-v1";
-        const GOOGLE_MAPS_API_KEY = "INSERISCI_API_KEY_GOOGLE_MAPS";
 
         // Mappa gli stati con i nomi dei campi
         const punchSteps = [
@@ -736,7 +750,7 @@
         }
 
         function hasGoogleMapsKey() {
-            return !!GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== "INSERISCI_API_KEY_GOOGLE_MAPS";
+            return !!GEOFENCE_CONFIG.googleMapsApiKey && GEOFENCE_CONFIG.googleMapsApiKey.length > 10;
         }
 
         function hideAddressSuggestions() {
@@ -757,6 +771,21 @@
             geoAddressSuggestionsEl.style.display = "block";
         }
 
+        function isPointInsidePolygon(pointLat, pointLng, polygonPath) {
+            if (!Array.isArray(polygonPath) || polygonPath.length < 3) return false;
+            let inside = false;
+            for (let i = 0, j = polygonPath.length - 1; i < polygonPath.length; j = i++) {
+                const xi = polygonPath[i].lat;
+                const yi = polygonPath[i].lng;
+                const xj = polygonPath[j].lat;
+                const yj = polygonPath[j].lng;
+                const intersect = ((yi > pointLng) !== (yj > pointLng)) &&
+                    (pointLat < (xj - xi) * (pointLng - yi) / ((yj - yi) || 1e-12) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
         async function ensureGoogleMapsLoaded() {
             if (!hasGoogleMapsKey()) return false;
             if (window.google?.maps?.places) return true;
@@ -769,7 +798,7 @@
                     delete window[callbackName];
                 };
                 const script = document.createElement("script");
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=${callbackName}`;
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${GEOFENCE_CONFIG.googleMapsApiKey}&libraries=places,geometry&callback=${callbackName}`;
                 script.async = true;
                 script.defer = true;
                 script.onerror = () => reject(new Error("Caricamento Google Maps fallito"));
@@ -811,6 +840,38 @@
                 fillColor: "#fdba74",
                 fillOpacity: 0.18,
             });
+            googlePolygon = new google.maps.Polygon({
+                map: googleMapInstance,
+                paths: GEOFENCE_CONFIG.polygonPath,
+                strokeColor: "#0ea5e9",
+                strokeOpacity: 0.9,
+                strokeWeight: 2,
+                fillColor: "#67e8f9",
+                fillOpacity: 0.2,
+                editable: true,
+            });
+
+            googlePolygon.addListener("mouseup", () => {
+                const path = googlePolygon.getPath();
+                const points = [];
+                for (let i = 0; i < path.getLength(); i++) {
+                    const p = path.getAt(i);
+                    points.push({ lat: p.lat(), lng: p.lng() });
+                }
+                GEOFENCE_CONFIG.polygonPath = points;
+            });
+
+            googleMapClickListener = googleMapInstance.addListener("click", (event) => {
+                if (!isPolygonDrawMode || !googlePolygon) return;
+                const path = googlePolygon.getPath();
+                path.push(event.latLng);
+                const points = [];
+                for (let i = 0; i < path.getLength(); i++) {
+                    const p = path.getAt(i);
+                    points.push({ lat: p.lat(), lng: p.lng() });
+                }
+                GEOFENCE_CONFIG.polygonPath = points;
+            });
             googlePlacesService = new google.maps.places.PlacesService(googleMapInstance);
             googleAutocompleteService = new google.maps.places.AutocompleteService();
             return true;
@@ -840,6 +901,9 @@
             googleCircleEntry.setRadius(radiusEntry);
             googleCircleExit.setCenter(center);
             googleCircleExit.setRadius(radiusExit);
+            if (googlePolygon) {
+                googlePolygon.setPaths(GEOFENCE_CONFIG.polygonPath || []);
+            }
         }
 
         async function fillAddressByPlaceId(placeId) {
@@ -882,6 +946,8 @@
             geoLngInput.value = GEOFENCE_CONFIG.centerLng || "";
             geoRadiusEntryInput.value = GEOFENCE_CONFIG.radiusEntryMeters || 120;
             geoRadiusExitInput.value = GEOFENCE_CONFIG.radiusExitMeters || 120;
+            geoMaxAccuracyInput.value = GEOFENCE_CONFIG.maxAccuracyMeters || 60;
+            geoGoogleMapsKeyInput.value = GEOFENCE_CONFIG.googleMapsApiKey || "";
             refreshMapPreview();
         }
 
@@ -903,6 +969,17 @@
                 if (Number.isFinite(parsed.radiusExitMeters) && parsed.radiusExitMeters > 0) {
                     GEOFENCE_CONFIG.radiusExitMeters = parsed.radiusExitMeters;
                 }
+                if (Number.isFinite(parsed.maxAccuracyMeters) && parsed.maxAccuracyMeters > 0) {
+                    GEOFENCE_CONFIG.maxAccuracyMeters = parsed.maxAccuracyMeters;
+                }
+                if (Array.isArray(parsed.polygonPath)) {
+                    GEOFENCE_CONFIG.polygonPath = parsed.polygonPath
+                        .filter(p => Number.isFinite(p?.lat) && Number.isFinite(p?.lng))
+                        .map(p => ({ lat: p.lat, lng: p.lng }));
+                }
+                if (typeof parsed.googleMapsApiKey === "string") {
+                    GEOFENCE_CONFIG.googleMapsApiKey = parsed.googleMapsApiKey.trim();
+                }
             } catch (error) {
                 console.warn("Config geofence non valida in localStorage:", error);
             }
@@ -913,6 +990,7 @@
             const lng = Number.parseFloat(geoLngInput.value.trim());
             const radiusEntry = Number.parseFloat(geoRadiusEntryInput.value);
             const radiusExit = Number.parseFloat(geoRadiusExitInput.value);
+            const maxAccuracy = Number.parseFloat(geoMaxAccuracyInput.value);
 
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
                 showMessage("Latitudine/Longitudine non valide.", true);
@@ -929,12 +1007,28 @@
                 updateGeoAdminStatus("Raggio uscita non valido.", true);
                 return false;
             }
+            if (!Number.isFinite(maxAccuracy) || maxAccuracy < 5) {
+                showMessage("Precisione GPS massima non valida (minimo 5m).", true);
+                updateGeoAdminStatus("Precisione GPS non valida.", true);
+                return false;
+            }
 
             GEOFENCE_CONFIG.address = geoAddressInput.value.trim();
             GEOFENCE_CONFIG.centerLat = lat;
             GEOFENCE_CONFIG.centerLng = lng;
             GEOFENCE_CONFIG.radiusEntryMeters = radiusEntry;
             GEOFENCE_CONFIG.radiusExitMeters = radiusExit;
+            GEOFENCE_CONFIG.maxAccuracyMeters = maxAccuracy;
+            GEOFENCE_CONFIG.googleMapsApiKey = geoGoogleMapsKeyInput.value.trim();
+
+            if (googleScriptLoadPromise && GEOFENCE_CONFIG.googleMapsApiKey) {
+                googleScriptLoadPromise = null;
+                googleMapInstance = null;
+                googleMarker = null;
+                googleCircleEntry = null;
+                googleCircleExit = null;
+                googlePolygon = null;
+            }
             persistGeofenceConfig();
             fillGeoAdminFormFromConfig();
             updateGeoAdminStatus("Impostazioni geofence salvate con successo.");
@@ -973,6 +1067,8 @@
 
         async function maybeAutoPunchFromPosition(position) {
             if (!currentUser || nextPunchIndex >= punchSteps.length) return;
+            const nowMs = Date.now();
+            if (nowMs - lastAutoPunchAt < 90000) return;
 
             const { latitude, longitude, accuracy } = position.coords;
             const distance = getDistanceMeters(
@@ -982,16 +1078,26 @@
                 GEOFENCE_CONFIG.centerLng
             );
             const requiredRadius = getRequiredRadiusByStep(nextPunchIndex);
-            const inside = distance <= requiredRadius;
+            const insideByRadius = distance <= requiredRadius;
+            const hasPolygon = Array.isArray(GEOFENCE_CONFIG.polygonPath) && GEOFENCE_CONFIG.polygonPath.length >= 3;
+            const insideByPolygon = hasPolygon ? isPointInsidePolygon(latitude, longitude, GEOFENCE_CONFIG.polygonPath) : false;
+            const inside = hasPolygon ? insideByPolygon : insideByRadius;
             const roundedDistance = Math.round(distance);
 
-            if (!inside) {
-                geoStatusEl.textContent = `Fuori area: ${roundedDistance} m (raggio richiesto ${Math.round(requiredRadius)} m, precisione ~${Math.round(accuracy)} m).`;
+            if (accuracy > GEOFENCE_CONFIG.maxAccuracyMeters) {
+                geoStatusEl.textContent = `Precisione GPS insufficiente (${Math.round(accuracy)} m > ${Math.round(GEOFENCE_CONFIG.maxAccuracyMeters)} m).`;
                 return;
             }
 
-            geoStatusEl.textContent = `Dentro area: ${roundedDistance} m (raggio ${Math.round(requiredRadius)} m). Controllo timbratura...`;
+            if (!inside) {
+                const modeText = hasPolygon ? "area poligonale" : `raggio richiesto ${Math.round(requiredRadius)} m`;
+                geoStatusEl.textContent = `Fuori area: ${roundedDistance} m (${modeText}, precisione ~${Math.round(accuracy)} m).`;
+                return;
+            }
+
+            geoStatusEl.textContent = `Dentro area: ${roundedDistance} m. Controllo timbratura...`;
             await runSinglePunch();
+            lastAutoPunchAt = Date.now();
             geoStatusEl.textContent = `Dentro area: ${roundedDistance} m. Timbratura automatica attiva.`;
         }
         
@@ -1140,12 +1246,15 @@
             // Cerchiamo i dati preesistenti per la data
             const { data: existingData } = await supabase
                 .from("daily_punches")
-                .select("id, iniziomattina, finemattina, iniziopomeriggio, finepomeriggio, pausa_minuti")
+                .select("id, user_id, punch_date, iniziomattina, finemattina, iniziopomeriggio, finepomeriggio, pausa_minuti")
                 .eq("user_id", targetUserId)
                 .eq("punch_date", date)
                 .maybeSingle();
 
-            if (existingData) { payload = { ...existingData }; }
+            if (existingData) {
+                // Mantiene sempre le chiavi richieste per evitare NOT NULL su upsert
+                payload = { user_id: targetUserId, punch_date: date, ...existingData };
+            }
             // Applica il nuovo punch
             payload[field] = time;
 
@@ -1794,7 +1903,39 @@
             }
         });
 
-        [geoLatInput, geoLngInput, geoRadiusEntryInput, geoRadiusExitInput].forEach((input) => {
+        geoDrawPolygonBtn.addEventListener("click", async () => {
+            if (!isAdmin) {
+                showMessage("Solo admin possono disegnare l'area.", true);
+                return;
+            }
+            const ok = await ensureGoogleMapInitialized();
+            if (!ok) {
+                showMessage("Per disegnare l'area devi configurare una Google Maps API Key valida.", true);
+                return;
+            }
+            isPolygonDrawMode = !isPolygonDrawMode;
+            if (isPolygonDrawMode) {
+                geoDrawPolygonBtn.textContent = "Fine Disegno Area";
+                updateGeoAdminStatus("Modalità disegno attiva: clicca sulla mappa per aggiungere i vertici.");
+            } else {
+                geoDrawPolygonBtn.textContent = "Disegna Area";
+                updateGeoAdminStatus("Disegno area completato. Salva impostazioni.");
+            }
+        });
+
+        geoClearPolygonBtn.addEventListener("click", async () => {
+            if (!isAdmin) {
+                showMessage("Solo admin possono modificare l'area.", true);
+                return;
+            }
+            GEOFENCE_CONFIG.polygonPath = [];
+            isPolygonDrawMode = false;
+            geoDrawPolygonBtn.textContent = "Disegna Area";
+            await refreshMapPreview();
+            updateGeoAdminStatus("Area poligonale rimossa. Salva impostazioni.");
+        });
+
+        [geoLatInput, geoLngInput, geoRadiusEntryInput, geoRadiusExitInput, geoMaxAccuracyInput].forEach((input) => {
             input.addEventListener("input", () => {
                 refreshMapPreview();
             });
@@ -1905,6 +2046,17 @@
                 return;
             }
 
+            const createdUser = signUpData?.user;
+            const isLikelyExistingUser =
+                !createdUser ||
+                !Array.isArray(createdUser.identities) ||
+                createdUser.identities.length === 0;
+
+            if (isLikelyExistingUser) {
+                showMessage("Email già registrata o utente non creato. Verifica l'indirizzo email.", true);
+                return;
+            }
+
             const createdUserId = signUpData?.user?.id;
             if (!createdUserId) {
                 showMessage("Registrazione avviata, ma ID utente non disponibile.", true);
@@ -1923,6 +2075,8 @@
                 console.error("ERRORE SALVATAGGIO PROFILO:", profileError);
                 if (isRlsPolicyError(profileError)) {
                     showMessage("Utente creato. Profilo non salvato per policy RLS: configura policy/trigger su Supabase.", true);
+                } else if ((profileError.message || "").toLowerCase().includes("foreign key")) {
+                    showMessage("Utente creato su Auth ma profilo non sincronizzato. Serve trigger su auth.users -> profiles.", true);
                 } else {
                     showMessage(`Utente creato ma profilo non aggiornato: ${profileError.message}`, true);
                 }
