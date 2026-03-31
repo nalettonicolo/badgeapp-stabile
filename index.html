@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Timbrature Online</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         /* ------------------------------------------------
          * 1. Stili Base e Globali
@@ -416,7 +417,6 @@
                 <input type="number" id="geo-radius-entry" min="10" step="5" placeholder="Raggio Ingresso (metri)" />
                 <input type="number" id="geo-radius-exit" min="10" step="5" placeholder="Raggio Uscita (metri)" />
                 <input type="number" id="geo-max-accuracy" min="5" step="1" placeholder="Precisione GPS max accettata (metri)" />
-                <input type="password" id="geo-google-maps-key" placeholder="Google Maps API Key" />
             </div>
             <div id="geo-address-suggestions" style="margin-top: 8px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; max-height: 180px; overflow-y: auto; display: none;"></div>
             <div id="geo-map-preview" style="margin-top: 10px; height: 260px; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; background: #f3f4f6;"></div>
@@ -510,7 +510,7 @@
         </div>
     </div>
 
-
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -586,7 +586,6 @@
         const geoRadiusEntryInput = document.getElementById("geo-radius-entry");
         const geoRadiusExitInput = document.getElementById("geo-radius-exit");
         const geoMaxAccuracyInput = document.getElementById("geo-max-accuracy");
-        const geoGoogleMapsKeyInput = document.getElementById("geo-google-maps-key");
         const geoGeocodeBtn = document.getElementById("geo-geocode-btn");
         const geoUseCurrentPositionBtn = document.getElementById("geo-use-current-position-btn");
         const geoDrawPolygonBtn = document.getElementById("geo-draw-polygon-btn");
@@ -628,17 +627,14 @@
         let currentHistoryUserId = null;
         let geoWatchId = null;
         let autoPunchInProgress = false;
-        let googleScriptLoadPromise = null;
-        let googleMapInstance = null;
-        let googleMarker = null;
-        let googleCircleEntry = null;
-        let googleCircleExit = null;
-        let googlePolygon = null;
-        let googleMapClickListener = null;
+        let leafletMapInstance = null;
+        let leafletMarker = null;
+        let leafletCircleEntry = null;
+        let leafletCircleExit = null;
+        let leafletPolygon = null;
+        let leafletMapClickHandler = null;
         let isPolygonDrawMode = false;
         let lastAutoPunchAt = 0;
-        let googlePlacesService = null;
-        let googleAutocompleteService = null;
         let addressTypingDebounce = null;
         const allViews = [loginView, punchView, historyView, adminView]; 
 
@@ -651,7 +647,6 @@
             radiusExitMeters: 120,
             maxAccuracyMeters: 60,
             polygonPath: [],
-            googleMapsApiKey: "",
         };
         const GEOFENCE_STORAGE_KEY = "badgeapp-geofence-config-v1";
 
@@ -749,23 +744,19 @@
             return index === 0 || index === 2;
         }
 
-        function hasGoogleMapsKey() {
-            return !!GEOFENCE_CONFIG.googleMapsApiKey && GEOFENCE_CONFIG.googleMapsApiKey.length > 10;
-        }
-
         function hideAddressSuggestions() {
             geoAddressSuggestionsEl.innerHTML = "";
             geoAddressSuggestionsEl.style.display = "none";
         }
 
-        function renderAddressSuggestions(predictions) {
-            if (!predictions || predictions.length === 0) {
+        function renderAddressSuggestions(suggestions) {
+            if (!suggestions || suggestions.length === 0) {
                 hideAddressSuggestions();
                 return;
             }
-            geoAddressSuggestionsEl.innerHTML = predictions.map((prediction) => `
-                <button type="button" data-place-id="${prediction.place_id}" style="display:block; width:100%; text-align:left; padding:8px 10px; border:none; border-bottom:1px solid #e5e7eb; background:#fff; cursor:pointer;">
-                    ${prediction.description}
+            geoAddressSuggestionsEl.innerHTML = suggestions.map((item) => `
+                <button type="button" data-lat="${item.lat}" data-lng="${item.lng}" data-label="${item.display_name}" style="display:block; width:100%; text-align:left; padding:8px 10px; border:none; border-bottom:1px solid #e5e7eb; background:#fff; cursor:pointer;">
+                    ${item.display_name}
                 </button>
             `).join("");
             geoAddressSuggestionsEl.style.display = "block";
@@ -786,102 +777,42 @@
             return inside;
         }
 
-        async function ensureGoogleMapsLoaded() {
-            if (!hasGoogleMapsKey()) return false;
-            if (window.google?.maps?.places) return true;
-            if (googleScriptLoadPromise) return googleScriptLoadPromise;
-
-            googleScriptLoadPromise = new Promise((resolve, reject) => {
-                const callbackName = "__badgeAppGoogleMapsReady";
-                window[callbackName] = () => {
-                    resolve(true);
-                    delete window[callbackName];
-                };
-                const script = document.createElement("script");
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${GEOFENCE_CONFIG.googleMapsApiKey}&libraries=places,geometry&callback=${callbackName}`;
-                script.async = true;
-                script.defer = true;
-                script.onerror = () => reject(new Error("Caricamento Google Maps fallito"));
-                document.head.appendChild(script);
-            });
-            return googleScriptLoadPromise;
-        }
-
         async function ensureGoogleMapInitialized() {
-            const loaded = await ensureGoogleMapsLoaded();
-            if (!loaded || !window.google?.maps) return false;
-            if (googleMapInstance) return true;
+            if (leafletMapInstance) return true;
+            if (typeof L === "undefined") return false;
 
-            const center = { lat: GEOFENCE_CONFIG.centerLat || 45.4642, lng: GEOFENCE_CONFIG.centerLng || 9.19 };
-            googleMapInstance = new google.maps.Map(geoMapPreviewEl, {
-                center,
-                zoom: 16,
-                mapTypeControl: false,
-                streetViewControl: false,
-            });
-            googleMarker = new google.maps.Marker({ map: googleMapInstance, position: center });
-            googleCircleEntry = new google.maps.Circle({
-                map: googleMapInstance,
-                center,
+            const lat = Number.parseFloat(GEOFENCE_CONFIG.centerLat) || 45.4642;
+            const lng = Number.parseFloat(GEOFENCE_CONFIG.centerLng) || 9.19;
+            leafletMapInstance = L.map(geoMapPreviewEl).setView([lat, lng], 16);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "&copy; OpenStreetMap contributors"
+            }).addTo(leafletMapInstance);
+
+            leafletMarker = L.marker([lat, lng]).addTo(leafletMapInstance);
+            leafletCircleEntry = L.circle([lat, lng], {
                 radius: GEOFENCE_CONFIG.radiusEntryMeters,
-                strokeColor: "#2563eb",
-                strokeOpacity: 0.8,
-                strokeWeight: 2,
+                color: "#2563eb",
                 fillColor: "#93c5fd",
-                fillOpacity: 0.2,
-            });
-            googleCircleExit = new google.maps.Circle({
-                map: googleMapInstance,
-                center,
+                fillOpacity: 0.2
+            }).addTo(leafletMapInstance);
+            leafletCircleExit = L.circle([lat, lng], {
                 radius: GEOFENCE_CONFIG.radiusExitMeters,
-                strokeColor: "#f97316",
-                strokeOpacity: 0.8,
-                strokeWeight: 2,
+                color: "#f97316",
                 fillColor: "#fdba74",
-                fillOpacity: 0.18,
-            });
-            googlePolygon = new google.maps.Polygon({
-                map: googleMapInstance,
-                paths: GEOFENCE_CONFIG.polygonPath,
-                strokeColor: "#0ea5e9",
-                strokeOpacity: 0.9,
-                strokeWeight: 2,
-                fillColor: "#67e8f9",
-                fillOpacity: 0.2,
-                editable: true,
-            });
+                fillOpacity: 0.18
+            }).addTo(leafletMapInstance);
 
-            googlePolygon.addListener("mouseup", () => {
-                const path = googlePolygon.getPath();
-                const points = [];
-                for (let i = 0; i < path.getLength(); i++) {
-                    const p = path.getAt(i);
-                    points.push({ lat: p.lat(), lng: p.lng() });
-                }
-                GEOFENCE_CONFIG.polygonPath = points;
-            });
-
-            googleMapClickListener = googleMapInstance.addListener("click", (event) => {
-                if (!isPolygonDrawMode || !googlePolygon) return;
-                const path = googlePolygon.getPath();
-                path.push(event.latLng);
-                const points = [];
-                for (let i = 0; i < path.getLength(); i++) {
-                    const p = path.getAt(i);
-                    points.push({ lat: p.lat(), lng: p.lng() });
-                }
-                GEOFENCE_CONFIG.polygonPath = points;
-            });
-            googlePlacesService = new google.maps.places.PlacesService(googleMapInstance);
-            googleAutocompleteService = new google.maps.places.AutocompleteService();
+            if (leafletMapClickHandler) {
+                leafletMapInstance.off("click", leafletMapClickHandler);
+            }
+            leafletMapClickHandler = (event) => {
+                if (!isPolygonDrawMode) return;
+                GEOFENCE_CONFIG.polygonPath.push({ lat: event.latlng.lat, lng: event.latlng.lng });
+                refreshMapPreview();
+            };
+            leafletMapInstance.on("click", leafletMapClickHandler);
             return true;
-        }
-
-        function renderFallbackMap() {
-            const lat = Number.parseFloat(geoLatInput.value || GEOFENCE_CONFIG.centerLat || 45.4642);
-            const lng = Number.parseFloat(geoLngInput.value || GEOFENCE_CONFIG.centerLng || 9.19);
-            const mapUrl = `https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
-            geoMapPreviewEl.innerHTML = `<iframe title="Mappa sede" src="${mapUrl}" width="100%" height="100%" style="border:0;" loading="lazy"></iframe>`;
         }
 
         async function refreshMapPreview() {
@@ -890,42 +821,24 @@
             const radiusEntry = Number.parseFloat(geoRadiusEntryInput.value || GEOFENCE_CONFIG.radiusEntryMeters || 120);
             const radiusExit = Number.parseFloat(geoRadiusExitInput.value || GEOFENCE_CONFIG.radiusExitMeters || 120);
             const loaded = await ensureGoogleMapInitialized();
-            if (!loaded || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-                renderFallbackMap();
-                return;
-            }
-            const center = { lat, lng };
-            googleMapInstance.setCenter(center);
-            googleMarker.setPosition(center);
-            googleCircleEntry.setCenter(center);
-            googleCircleEntry.setRadius(radiusEntry);
-            googleCircleExit.setCenter(center);
-            googleCircleExit.setRadius(radiusExit);
-            if (googlePolygon) {
-                googlePolygon.setPaths(GEOFENCE_CONFIG.polygonPath || []);
-            }
-        }
+            if (!loaded || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
-        async function fillAddressByPlaceId(placeId) {
-            const loaded = await ensureGoogleMapInitialized();
-            if (!loaded || !googlePlacesService) return false;
-            return new Promise((resolve) => {
-                googlePlacesService.getDetails(
-                    { placeId, fields: ["formatted_address", "geometry"] },
-                    (place, status) => {
-                        if (status !== google.maps.places.PlacesServiceStatus.OK || !place?.geometry?.location) {
-                            resolve(false);
-                            return;
-                        }
-                        geoAddressInput.value = place.formatted_address || geoAddressInput.value;
-                        geoLatInput.value = place.geometry.location.lat().toFixed(6);
-                        geoLngInput.value = place.geometry.location.lng().toFixed(6);
-                        hideAddressSuggestions();
-                        refreshMapPreview();
-                        resolve(true);
-                    }
-                );
-            });
+            leafletMapInstance.setView([lat, lng], leafletMapInstance.getZoom());
+            leafletMarker.setLatLng([lat, lng]);
+            leafletCircleEntry.setLatLng([lat, lng]).setRadius(radiusEntry);
+            leafletCircleExit.setLatLng([lat, lng]).setRadius(radiusExit);
+
+            if (leafletPolygon) {
+                leafletMapInstance.removeLayer(leafletPolygon);
+                leafletPolygon = null;
+            }
+            if (Array.isArray(GEOFENCE_CONFIG.polygonPath) && GEOFENCE_CONFIG.polygonPath.length >= 3) {
+                leafletPolygon = L.polygon(GEOFENCE_CONFIG.polygonPath, {
+                    color: "#0ea5e9",
+                    fillColor: "#67e8f9",
+                    fillOpacity: 0.2
+                }).addTo(leafletMapInstance);
+            }
         }
 
         function getRequiredRadiusByStep(index) {
@@ -947,7 +860,6 @@
             geoRadiusEntryInput.value = GEOFENCE_CONFIG.radiusEntryMeters || 120;
             geoRadiusExitInput.value = GEOFENCE_CONFIG.radiusExitMeters || 120;
             geoMaxAccuracyInput.value = GEOFENCE_CONFIG.maxAccuracyMeters || 60;
-            geoGoogleMapsKeyInput.value = GEOFENCE_CONFIG.googleMapsApiKey || "";
             refreshMapPreview();
         }
 
@@ -976,9 +888,6 @@
                     GEOFENCE_CONFIG.polygonPath = parsed.polygonPath
                         .filter(p => Number.isFinite(p?.lat) && Number.isFinite(p?.lng))
                         .map(p => ({ lat: p.lat, lng: p.lng }));
-                }
-                if (typeof parsed.googleMapsApiKey === "string") {
-                    GEOFENCE_CONFIG.googleMapsApiKey = parsed.googleMapsApiKey.trim();
                 }
             } catch (error) {
                 console.warn("Config geofence non valida in localStorage:", error);
@@ -1019,16 +928,6 @@
             GEOFENCE_CONFIG.radiusEntryMeters = radiusEntry;
             GEOFENCE_CONFIG.radiusExitMeters = radiusExit;
             GEOFENCE_CONFIG.maxAccuracyMeters = maxAccuracy;
-            GEOFENCE_CONFIG.googleMapsApiKey = geoGoogleMapsKeyInput.value.trim();
-
-            if (googleScriptLoadPromise && GEOFENCE_CONFIG.googleMapsApiKey) {
-                googleScriptLoadPromise = null;
-                googleMapInstance = null;
-                googleMarker = null;
-                googleCircleEntry = null;
-                googleCircleExit = null;
-                googlePolygon = null;
-            }
             persistGeofenceConfig();
             fillGeoAdminFormFromConfig();
             updateGeoAdminStatus("Impostazioni geofence salvate con successo.");
@@ -1832,34 +1731,21 @@
             }
             updateGeoAdminStatus("Ricerca coordinate da indirizzo in corso...");
             try {
-                let foundWithGoogle = false;
-                if (hasGoogleMapsKey()) {
-                    const loaded = await ensureGoogleMapInitialized();
-                    if (loaded && googleAutocompleteService) {
-                        const predictions = await new Promise((resolve) => {
-                            googleAutocompleteService.getPlacePredictions({ input: address }, (preds) => resolve(preds || []));
-                        });
-                        if (predictions.length > 0) {
-                            foundWithGoogle = await fillAddressByPlaceId(predictions[0].place_id);
-                        }
-                    }
+                const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const results = await response.json();
+                if (!Array.isArray(results) || results.length === 0) {
+                    updateGeoAdminStatus("Nessun risultato trovato per l'indirizzo.", true);
+                    showMessage("Nessuna coordinata trovata per questo indirizzo.", true);
+                    return;
                 }
-
-                if (!foundWithGoogle) {
-                    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-                    const response = await fetch(url);
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    const results = await response.json();
-                    if (!Array.isArray(results) || results.length === 0) {
-                        updateGeoAdminStatus("Nessun risultato trovato per l'indirizzo.", true);
-                        showMessage("Nessuna coordinata trovata per questo indirizzo.", true);
-                        return;
-                    }
-                    const first = results[0];
-                    geoLatInput.value = Number.parseFloat(first.lat).toFixed(6);
-                    geoLngInput.value = Number.parseFloat(first.lon).toFixed(6);
-                    refreshMapPreview();
-                }
+                const first = results[0];
+                geoAddressInput.value = first.display_name || geoAddressInput.value;
+                geoLatInput.value = Number.parseFloat(first.lat).toFixed(6);
+                geoLngInput.value = Number.parseFloat(first.lon).toFixed(6);
+                hideAddressSuggestions();
+                refreshMapPreview();
 
                 updateGeoAdminStatus("Coordinate trovate. Verifica e salva le impostazioni.");
             } catch (error) {
@@ -1878,29 +1764,32 @@
             }
 
             addressTypingDebounce = setTimeout(async () => {
-                if (!hasGoogleMapsKey()) {
-                    updateGeoAdminStatus("Autocomplete Google attivo quando inserisci GOOGLE_MAPS_API_KEY.", true);
-                    return;
+                try {
+                    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(query)}`;
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const suggestions = await response.json();
+                    renderAddressSuggestions(Array.isArray(suggestions) ? suggestions : []);
+                } catch (error) {
+                    console.error("ERRORE AUTOCOMPLETE OSM:", error);
+                    hideAddressSuggestions();
                 }
-                const loaded = await ensureGoogleMapInitialized();
-                if (!loaded || !googleAutocompleteService) return;
-                googleAutocompleteService.getPlacePredictions({ input: query }, (predictions) => {
-                    renderAddressSuggestions(predictions || []);
-                });
             }, 250);
         });
 
         geoAddressSuggestionsEl.addEventListener("click", async (event) => {
-            const button = event.target.closest("button[data-place-id]");
+            const button = event.target.closest("button[data-lat][data-lng]");
             if (!button) return;
-            const placeId = button.getAttribute("data-place-id");
-            if (!placeId) return;
-            const ok = await fillAddressByPlaceId(placeId);
-            if (ok) {
-                updateGeoAdminStatus("Indirizzo selezionato. Controlla raggi e salva.");
-            } else {
-                showMessage("Dettaglio indirizzo non disponibile. Prova un altro suggerimento.", true);
-            }
+            const lat = Number.parseFloat(button.getAttribute("data-lat"));
+            const lng = Number.parseFloat(button.getAttribute("data-lng"));
+            const label = button.getAttribute("data-label") || geoAddressInput.value;
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            geoAddressInput.value = label;
+            geoLatInput.value = lat.toFixed(6);
+            geoLngInput.value = lng.toFixed(6);
+            hideAddressSuggestions();
+            await refreshMapPreview();
+            updateGeoAdminStatus("Indirizzo selezionato. Controlla raggi e salva.");
         });
 
         geoDrawPolygonBtn.addEventListener("click", async () => {
@@ -1910,7 +1799,7 @@
             }
             const ok = await ensureGoogleMapInitialized();
             if (!ok) {
-                showMessage("Per disegnare l'area devi configurare una Google Maps API Key valida.", true);
+                showMessage("Mappa non inizializzata. Riprova tra qualche secondo.", true);
                 return;
             }
             isPolygonDrawMode = !isPolygonDrawMode;
