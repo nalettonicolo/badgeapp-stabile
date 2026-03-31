@@ -18,7 +18,7 @@ git init
 git add .
 git commit -m "Initial stable release"
 git branch -M main
-git remote add origin https://github.com/TUO-USER/badgeapp-stabile.git
+git remote add origin https://github.com/nalettonicolo/badgeapp-stabile
 git push -u origin main
 
 --------------------------------------------------
@@ -71,6 +71,23 @@ Nel file index.html trovi:
 Prima dell'uso imposta coordinate reali sede:
 - centerLat
 - centerLng
-- radiusMeters
+- radiusEntryMeters
+- radiusExitMeters
 
 Se centerLat/centerLng restano 0, la funzione non parte (blocco di sicurezza).
+
+--------------------------------------------------
+Workaround standby Supabase (Free)
+--------------------------------------------------
+Workflow già pronto nel repository:
+- .github/workflows/supabase-keepalive.yml
+
+Configura questi GitHub Secrets in repo > Settings > Secrets and variables > Actions:
+- SUPABASE_URL (es. https://xxxx.supabase.co)
+- SUPABASE_ANON_KEY
+
+Poi avvia un test manuale:
+- Actions > Supabase Keepalive > Run workflow
+
+Nota:
+- È un workaround, non una garanzia "always on" del free tier.
