@@ -714,18 +714,53 @@
             return R * c;
         }
 
-        function createOneShotAuthClient() {
-            return createClient(supabaseUrl, supabaseAnonKey, {
-                auth: {
-                    persistSession: false,
-                    autoRefreshToken: false,
-                    detectSessionInUrl: false,
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function signUpUserViaAuthApi({ email, password, firstName, lastName, employeeIsAdmin }) {
+            const response = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "apikey": supabaseAnonKey
                 },
-                global: {
-                    headers: { 'x-client-info': 'supabase-js/v2' },
-                    timeout: 8000
-                }
+                body: JSON.stringify({
+                    email,
+                    password,
+                    data: {
+                        first_name: firstName,
+                        last_name: lastName,
+                        is_admin_requested: employeeIsAdmin,
+                    }
+                })
             });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                return {
+                    data: null,
+                    error: { message: payload?.msg || payload?.error_description || payload?.error || `HTTP ${response.status}` }
+                };
+            }
+            return { data: payload, error: null };
+        }
+
+        async function upsertProfileWithRetry(profilePayload, maxAttempts = 5) {
+            let lastError = null;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                const { error } = await supabase.from("profiles").upsert(profilePayload);
+                if (!error) return null;
+                lastError = error;
+
+                const msg = (error.message || "").toLowerCase();
+                const isFkIssue = msg.includes("foreign key");
+                if (!isFkIssue || attempt === maxAttempts) {
+                    return error;
+                }
+                await sleep(300 * attempt);
+            }
+            return lastError;
         }
 
         function isRlsPolicyError(error) {
@@ -1154,6 +1189,8 @@
                 // Mantiene sempre le chiavi richieste per evitare NOT NULL su upsert
                 payload = { user_id: targetUserId, punch_date: date, ...existingData };
             }
+            payload.user_id = targetUserId;
+            payload.punch_date = date;
             // Applica il nuovo punch
             payload[field] = time;
 
@@ -1192,6 +1229,8 @@
                 punch_date: date,
                 ...(existingData || {}) 
             };
+            payload.user_id = targetUserId;
+            payload.punch_date = date;
 
             // 3. Sovrascrivi con i nuovi valori (se forniti)
             // Usiamo null se il campo input è vuoto, permettendo la "cancellazione" di una timbratura.
@@ -1916,17 +1955,12 @@
                 return;
             }
 
-            const authClient = createOneShotAuthClient();
-            const { data: signUpData, error: signUpError } = await authClient.auth.signUp({
+            const { data: signUpData, error: signUpError } = await signUpUserViaAuthApi({
                 email,
                 password,
-                options: {
-                    data: {
-                        first_name: firstName,
-                        last_name: lastName,
-                        is_admin_requested: employeeIsAdmin,
-                    }
-                }
+                firstName,
+                lastName,
+                employeeIsAdmin
             });
 
             if (signUpError) {
@@ -1952,7 +1986,7 @@
                 return;
             }
 
-            const { error: profileError } = await supabase.from("profiles").upsert({
+            const profileError = await upsertProfileWithRetry({
                 id: createdUserId,
                 email,
                 first_name: firstName,
