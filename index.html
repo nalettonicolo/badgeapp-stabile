@@ -394,13 +394,33 @@
                     font-weight: 700; margin-bottom: 15px; color: #f97316;">Reset Password Dipendente</h3>
                 <form id="reset-password-form">
                     <p style="font-size: 0.875rem;
-                        color: #6b7280;">L'operazione richiede la Service Key (non supportata in sicurezza lato client).</p>
-                    <input type="text" id="reset-user-id" placeholder="ID Utente (es. a1b2c3d4-...)" required />
+                        color: #6b7280;">Invia email di reset reale. Inserisci UID o email del dipendente.</p>
+                    <input type="text" id="reset-user-id" placeholder="ID Utente o Email dipendente" required />
                     <input type="password" id="reset-new-password" placeholder="Nuova Password (min 6 car.)" required minlength="6" />
                     <button type="submit" style="background-color: #f97316;
-                        color: white;">Simula Reset Password</button>
+                        color: white;">Invia Email Reset Password</button>
                 </form>
             </div>
+        </div>
+
+        <div class="form-section" style="margin-bottom: 20px;">
+            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 15px; color: #7c3aed;">Impostazioni Timbratura da Posizione</h3>
+            <p style="font-size: 0.875rem; color: #6b7280; margin-bottom: 10px;">
+                Imposta sede e tolleranze separate per timbrature di ingresso e uscita.
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <input type="text" id="geo-address" placeholder="Indirizzo sede (es. Via Roma 1, Milano)" />
+                <button type="button" id="geo-geocode-btn" style="background-color: #2563eb; color: white;">Trova Coordinate da Indirizzo</button>
+                <input type="text" id="geo-lat" placeholder="Latitudine (es. 45.4642)" />
+                <input type="text" id="geo-lng" placeholder="Longitudine (es. 9.1900)" />
+                <input type="number" id="geo-radius-entry" min="10" step="5" placeholder="Raggio Ingresso (metri)" />
+                <input type="number" id="geo-radius-exit" min="10" step="5" placeholder="Raggio Uscita (metri)" />
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button type="button" id="geo-use-current-position-btn" style="background-color: #059669; color: white; flex: 1;">Usa Posizione Attuale</button>
+                <button type="button" id="geo-save-settings-btn" style="background-color: #7c3aed; color: white; flex: 1;">Salva Impostazioni Geofence</button>
+            </div>
+            <p id="geo-admin-status" style="font-size: 0.875rem; color: #4b5563; margin-top: 8px;">Impostazioni geofence non ancora salvate.</p>
         </div>
         
         <div style="border: 1px solid #d1d5db;
@@ -545,6 +565,24 @@
         const manualTime = document.getElementById("manual-time");
         const geoToggleBtn = document.getElementById("geo-toggle-btn");
         const geoStatusEl = document.getElementById("geo-status");
+        const addEmployeeForm = document.getElementById("add-employee-form");
+        const newEmployeeFirstName = document.getElementById("new-employee-first-name");
+        const newEmployeeLastName = document.getElementById("new-employee-last-name");
+        const newEmployeeEmail = document.getElementById("new-employee-email");
+        const newEmployeePassword = document.getElementById("new-employee-password");
+        const newEmployeeIsAdmin = document.getElementById("new-employee-is-admin");
+        const resetPasswordForm = document.getElementById("reset-password-form");
+        const resetUserId = document.getElementById("reset-user-id");
+        const resetNewPassword = document.getElementById("reset-new-password");
+        const geoAddressInput = document.getElementById("geo-address");
+        const geoLatInput = document.getElementById("geo-lat");
+        const geoLngInput = document.getElementById("geo-lng");
+        const geoRadiusEntryInput = document.getElementById("geo-radius-entry");
+        const geoRadiusExitInput = document.getElementById("geo-radius-exit");
+        const geoGeocodeBtn = document.getElementById("geo-geocode-btn");
+        const geoUseCurrentPositionBtn = document.getElementById("geo-use-current-position-btn");
+        const geoSaveSettingsBtn = document.getElementById("geo-save-settings-btn");
+        const geoAdminStatusEl = document.getElementById("geo-admin-status");
         
         // NUOVI Elementi DOM per Inserimento Timbrature Mancanti
         const insertPunchModal = document.getElementById("insert-punch-modal");
@@ -582,10 +620,13 @@
 
         // Configura coordinate sede e raggio in metri.
         const GEOFENCE_CONFIG = {
+            address: "",
             centerLat: 0,
             centerLng: 0,
-            radiusMeters: 120,
+            radiusEntryMeters: 120,
+            radiusExitMeters: 120,
         };
+        const GEOFENCE_STORAGE_KEY = "badgeapp-geofence-config-v1";
 
         // Mappa gli stati con i nomi dei campi
         const punchSteps = [
@@ -651,10 +692,104 @@
             return R * c;
         }
 
+        function createOneShotAuthClient() {
+            return createClient(supabaseUrl, supabaseAnonKey, {
+                auth: {
+                    persistSession: false,
+                    autoRefreshToken: false,
+                    detectSessionInUrl: false,
+                },
+                global: {
+                    headers: { 'x-client-info': 'supabase-js/v2' },
+                    timeout: 8000
+                }
+            });
+        }
+
         function isGeofenceConfigured() {
             return Number.isFinite(GEOFENCE_CONFIG.centerLat) &&
                 Number.isFinite(GEOFENCE_CONFIG.centerLng) &&
                 !(GEOFENCE_CONFIG.centerLat === 0 && GEOFENCE_CONFIG.centerLng === 0);
+        }
+
+        function isEntryStep(index) {
+            return index === 0 || index === 2;
+        }
+
+        function getRequiredRadiusByStep(index) {
+            return isEntryStep(index)
+                ? GEOFENCE_CONFIG.radiusEntryMeters
+                : GEOFENCE_CONFIG.radiusExitMeters;
+        }
+
+        function updateGeoAdminStatus(message, isError = false) {
+            if (!geoAdminStatusEl) return;
+            geoAdminStatusEl.textContent = message;
+            geoAdminStatusEl.style.color = isError ? "#dc2626" : "#4b5563";
+        }
+
+        function fillGeoAdminFormFromConfig() {
+            geoAddressInput.value = GEOFENCE_CONFIG.address || "";
+            geoLatInput.value = GEOFENCE_CONFIG.centerLat || "";
+            geoLngInput.value = GEOFENCE_CONFIG.centerLng || "";
+            geoRadiusEntryInput.value = GEOFENCE_CONFIG.radiusEntryMeters || 120;
+            geoRadiusExitInput.value = GEOFENCE_CONFIG.radiusExitMeters || 120;
+        }
+
+        function persistGeofenceConfig() {
+            localStorage.setItem(GEOFENCE_STORAGE_KEY, JSON.stringify(GEOFENCE_CONFIG));
+        }
+
+        function loadGeofenceConfig() {
+            const raw = localStorage.getItem(GEOFENCE_STORAGE_KEY);
+            if (!raw) return;
+            try {
+                const parsed = JSON.parse(raw);
+                if (typeof parsed.address === "string") GEOFENCE_CONFIG.address = parsed.address;
+                if (Number.isFinite(parsed.centerLat)) GEOFENCE_CONFIG.centerLat = parsed.centerLat;
+                if (Number.isFinite(parsed.centerLng)) GEOFENCE_CONFIG.centerLng = parsed.centerLng;
+                if (Number.isFinite(parsed.radiusEntryMeters) && parsed.radiusEntryMeters > 0) {
+                    GEOFENCE_CONFIG.radiusEntryMeters = parsed.radiusEntryMeters;
+                }
+                if (Number.isFinite(parsed.radiusExitMeters) && parsed.radiusExitMeters > 0) {
+                    GEOFENCE_CONFIG.radiusExitMeters = parsed.radiusExitMeters;
+                }
+            } catch (error) {
+                console.warn("Config geofence non valida in localStorage:", error);
+            }
+        }
+
+        function applyGeofenceConfigFromAdminForm() {
+            const lat = Number.parseFloat(geoLatInput.value.trim());
+            const lng = Number.parseFloat(geoLngInput.value.trim());
+            const radiusEntry = Number.parseFloat(geoRadiusEntryInput.value);
+            const radiusExit = Number.parseFloat(geoRadiusExitInput.value);
+
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                showMessage("Latitudine/Longitudine non valide.", true);
+                updateGeoAdminStatus("Coordinate non valide.", true);
+                return false;
+            }
+            if (!Number.isFinite(radiusEntry) || radiusEntry < 10) {
+                showMessage("Raggio ingresso non valido (minimo 10m).", true);
+                updateGeoAdminStatus("Raggio ingresso non valido.", true);
+                return false;
+            }
+            if (!Number.isFinite(radiusExit) || radiusExit < 10) {
+                showMessage("Raggio uscita non valido (minimo 10m).", true);
+                updateGeoAdminStatus("Raggio uscita non valido.", true);
+                return false;
+            }
+
+            GEOFENCE_CONFIG.address = geoAddressInput.value.trim();
+            GEOFENCE_CONFIG.centerLat = lat;
+            GEOFENCE_CONFIG.centerLng = lng;
+            GEOFENCE_CONFIG.radiusEntryMeters = radiusEntry;
+            GEOFENCE_CONFIG.radiusExitMeters = radiusExit;
+            persistGeofenceConfig();
+            fillGeoAdminFormFromConfig();
+            updateGeoAdminStatus("Impostazioni geofence salvate con successo.");
+            return true;
         }
 
         function stopGeoTracking() {
@@ -697,17 +832,18 @@
                 GEOFENCE_CONFIG.centerLat,
                 GEOFENCE_CONFIG.centerLng
             );
-            const inside = distance <= GEOFENCE_CONFIG.radiusMeters;
+            const requiredRadius = getRequiredRadiusByStep(nextPunchIndex);
+            const inside = distance <= requiredRadius;
             const roundedDistance = Math.round(distance);
 
             if (!inside) {
-                geoStatusEl.textContent = `Fuori area: ${roundedDistance} m dal centro (precisione ~${Math.round(accuracy)} m).`;
+                geoStatusEl.textContent = `Fuori area: ${roundedDistance} m (raggio richiesto ${Math.round(requiredRadius)} m, precisione ~${Math.round(accuracy)} m).`;
                 return;
             }
 
-            geoStatusEl.textContent = `Dentro area: ${roundedDistance} m dal centro. Controllo timbratura...`;
+            geoStatusEl.textContent = `Dentro area: ${roundedDistance} m (raggio ${Math.round(requiredRadius)} m). Controllo timbratura...`;
             await runSinglePunch();
-            geoStatusEl.textContent = `Dentro area: ${roundedDistance} m dal centro. Timbratura automatica attiva.`;
+            geoStatusEl.textContent = `Dentro area: ${roundedDistance} m. Timbratura automatica attiva.`;
         }
         
         function timeToMinutes(time) {
@@ -1344,6 +1480,7 @@
         fixedAdminBtn.addEventListener("click", async () => {
             if (isAdmin) {
                 showView(adminView);
+                fillGeoAdminFormFromConfig();
                 await loadAllProfiles();
             } else {
                 showMessage("Funzionalità riservata agli amministratori.", true);
@@ -1388,6 +1525,71 @@
                     maximumAge: 5000,
                 }
             );
+        });
+
+        geoSaveSettingsBtn.addEventListener("click", () => {
+            if (!isAdmin) {
+                showMessage("Solo admin possono cambiare la geofence.", true);
+                return;
+            }
+            applyGeofenceConfigFromAdminForm();
+        });
+
+        geoUseCurrentPositionBtn.addEventListener("click", () => {
+            if (!isAdmin) {
+                showMessage("Solo admin possono cambiare la geofence.", true);
+                return;
+            }
+            if (!navigator.geolocation) {
+                showMessage("Geolocalizzazione non supportata su questo dispositivo/browser.", true);
+                return;
+            }
+
+            updateGeoAdminStatus("Lettura posizione corrente...");
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    geoLatInput.value = position.coords.latitude.toFixed(6);
+                    geoLngInput.value = position.coords.longitude.toFixed(6);
+                    updateGeoAdminStatus("Posizione corrente acquisita. Salva le impostazioni.");
+                },
+                (error) => {
+                    updateGeoAdminStatus(`Errore posizione: ${error.message}`, true);
+                    showMessage(`Errore geolocalizzazione: ${error.message}`, true);
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        });
+
+        geoGeocodeBtn.addEventListener("click", async () => {
+            if (!isAdmin) {
+                showMessage("Solo admin possono cambiare la geofence.", true);
+                return;
+            }
+            const address = geoAddressInput.value.trim();
+            if (!address) {
+                showMessage("Inserisci un indirizzo da cercare.", true);
+                return;
+            }
+            updateGeoAdminStatus("Ricerca coordinate da indirizzo in corso...");
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const results = await response.json();
+                if (!Array.isArray(results) || results.length === 0) {
+                    updateGeoAdminStatus("Nessun risultato trovato per l'indirizzo.", true);
+                    showMessage("Nessuna coordinata trovata per questo indirizzo.", true);
+                    return;
+                }
+                const first = results[0];
+                geoLatInput.value = Number.parseFloat(first.lat).toFixed(6);
+                geoLngInput.value = Number.parseFloat(first.lon).toFixed(6);
+                updateGeoAdminStatus("Coordinate trovate. Verifica e salva le impostazioni.");
+            } catch (error) {
+                console.error("ERRORE GEOCODING:", error);
+                updateGeoAdminStatus("Errore durante la ricerca coordinate.", true);
+                showMessage("Impossibile risolvere l'indirizzo ora. Inserisci lat/lng manualmente.", true);
+            }
         });
 
         // 🔹 Gestione Timbro Singolo (UI odierna)
@@ -1457,8 +1659,111 @@
             showMessage("Disconnessione avvenuta con successo.");
         });
 
+        // 🔹 Registra dipendente (reale)
+        addEmployeeForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            if (!isAdmin || !currentUser) {
+                showMessage("Accesso negato. Solo amministratori.", true);
+                return;
+            }
+
+            const firstName = newEmployeeFirstName.value.trim();
+            const lastName = newEmployeeLastName.value.trim();
+            const email = newEmployeeEmail.value.trim().toLowerCase();
+            const password = newEmployeePassword.value;
+            const employeeIsAdmin = newEmployeeIsAdmin.checked;
+
+            if (!firstName || !lastName || !email || !password) {
+                showMessage("Compila tutti i campi richiesti.", true);
+                return;
+            }
+
+            const authClient = createOneShotAuthClient();
+            const { data: signUpData, error: signUpError } = await authClient.auth.signUp({
+                email,
+                password,
+            });
+
+            if (signUpError) {
+                console.error("ERRORE REGISTRAZIONE UTENTE:", signUpError);
+                showMessage(`Errore registrazione utente: ${signUpError.message}`, true);
+                return;
+            }
+
+            const createdUserId = signUpData?.user?.id;
+            if (!createdUserId) {
+                showMessage("Registrazione avviata, ma ID utente non disponibile.", true);
+                return;
+            }
+
+            const { error: profileError } = await supabase.from("profiles").upsert({
+                id: createdUserId,
+                email,
+                first_name: firstName,
+                last_name: lastName,
+                is_admin: employeeIsAdmin,
+            });
+
+            if (profileError) {
+                console.error("ERRORE SALVATAGGIO PROFILO:", profileError);
+                showMessage(`Utente creato ma profilo non aggiornato: ${profileError.message}`, true);
+                return;
+            }
+
+            addEmployeeForm.reset();
+            showMessage("Dipendente registrato con successo.");
+            await loadAllProfiles();
+        });
+
+        // 🔹 Reset password reale via email (da UID o email)
+        resetPasswordForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            if (!isAdmin || !currentUser) {
+                showMessage("Accesso negato. Solo amministratori.", true);
+                return;
+            }
+
+            const userIdentifier = resetUserId.value.trim();
+            const requestedPassword = resetNewPassword.value.trim();
+
+            if (!userIdentifier || !requestedPassword) {
+                showMessage("Compila tutti i campi richiesti.", true);
+                return;
+            }
+
+            let targetEmail = userIdentifier;
+            if (!targetEmail.includes("@")) {
+                const { data: profileById, error: profileLookupError } = await supabase
+                    .from("profiles")
+                    .select("email")
+                    .eq("id", userIdentifier)
+                    .maybeSingle();
+
+                if (profileLookupError || !profileById?.email) {
+                    showMessage("UID non trovato. Inserisci un UID valido o una email.", true);
+                    return;
+                }
+                targetEmail = profileById.email;
+            }
+
+            const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+                redirectTo: window.location.origin,
+            });
+
+            if (error) {
+                console.error("ERRORE RESET PASSWORD:", error);
+                showMessage(`Errore reset password: ${error.message}`, true);
+                return;
+            }
+
+            showMessage(`Email di reset inviata a ${targetEmail}. La nuova password verrà impostata dal dipendente dal link ricevuto.`);
+        });
+
 
         // 🔹 Stato autenticazione (entry point principale)
+        loadGeofenceConfig();
+        fillGeoAdminFormFromConfig();
+
         supabase.auth.onAuthStateChange((event, session) => {
             updateAuthUI();
         });
