@@ -649,6 +649,7 @@
             polygonPath: [],
         };
         const GEOFENCE_STORAGE_KEY = "badgeapp-geofence-config-v1";
+        const GEOFENCE_DB_ID = 1;
 
         // Mappa gli stati con i nomi dei campi
         const punchSteps = [
@@ -898,11 +899,11 @@
             refreshMapPreview();
         }
 
-        function persistGeofenceConfig() {
+        function persistGeofenceConfigLocal() {
             localStorage.setItem(GEOFENCE_STORAGE_KEY, JSON.stringify(GEOFENCE_CONFIG));
         }
 
-        function loadGeofenceConfig() {
+        function loadGeofenceConfigLocal() {
             const raw = localStorage.getItem(GEOFENCE_STORAGE_KEY);
             if (!raw) return;
             try {
@@ -929,7 +930,69 @@
             }
         }
 
-        function applyGeofenceConfigFromAdminForm() {
+        async function loadGeofenceConfig() {
+            const { data, error } = await supabase
+                .from("geofence_settings")
+                .select("id, address, center_lat, center_lng, radius_entry_meters, radius_exit_meters, max_accuracy_meters, polygon_path")
+                .eq("id", GEOFENCE_DB_ID)
+                .maybeSingle();
+
+            if (error) {
+                console.warn("Errore lettura geofence da Supabase, uso fallback locale:", error.message);
+                loadGeofenceConfigLocal();
+                return false;
+            }
+            if (!data) {
+                loadGeofenceConfigLocal();
+                return false;
+            }
+
+            if (typeof data.address === "string") GEOFENCE_CONFIG.address = data.address;
+            if (Number.isFinite(data.center_lat)) GEOFENCE_CONFIG.centerLat = data.center_lat;
+            if (Number.isFinite(data.center_lng)) GEOFENCE_CONFIG.centerLng = data.center_lng;
+            if (Number.isFinite(data.radius_entry_meters) && data.radius_entry_meters > 0) {
+                GEOFENCE_CONFIG.radiusEntryMeters = data.radius_entry_meters;
+            }
+            if (Number.isFinite(data.radius_exit_meters) && data.radius_exit_meters > 0) {
+                GEOFENCE_CONFIG.radiusExitMeters = data.radius_exit_meters;
+            }
+            if (Number.isFinite(data.max_accuracy_meters) && data.max_accuracy_meters > 0) {
+                GEOFENCE_CONFIG.maxAccuracyMeters = data.max_accuracy_meters;
+            }
+            if (Array.isArray(data.polygon_path)) {
+                GEOFENCE_CONFIG.polygonPath = data.polygon_path
+                    .filter(p => Number.isFinite(p?.lat) && Number.isFinite(p?.lng))
+                    .map(p => ({ lat: p.lat, lng: p.lng }));
+            }
+
+            // Cache locale come fallback
+            persistGeofenceConfigLocal();
+            return true;
+        }
+
+        async function persistGeofenceConfig() {
+            persistGeofenceConfigLocal();
+
+            const payload = {
+                id: GEOFENCE_DB_ID,
+                address: GEOFENCE_CONFIG.address || "",
+                center_lat: GEOFENCE_CONFIG.centerLat,
+                center_lng: GEOFENCE_CONFIG.centerLng,
+                radius_entry_meters: GEOFENCE_CONFIG.radiusEntryMeters,
+                radius_exit_meters: GEOFENCE_CONFIG.radiusExitMeters,
+                max_accuracy_meters: GEOFENCE_CONFIG.maxAccuracyMeters,
+                polygon_path: Array.isArray(GEOFENCE_CONFIG.polygonPath) ? GEOFENCE_CONFIG.polygonPath : [],
+                updated_at: new Date().toISOString(),
+                updated_by: currentUser?.id || null,
+            };
+
+            const { error } = await supabase
+                .from("geofence_settings")
+                .upsert(payload, { onConflict: "id", ignoreDuplicates: false });
+            return { error };
+        }
+
+        async function applyGeofenceConfigFromAdminForm() {
             const lat = Number.parseFloat(geoLatInput.value.trim());
             const lng = Number.parseFloat(geoLngInput.value.trim());
             const radiusEntry = Number.parseFloat(geoRadiusEntryInput.value);
@@ -963,9 +1026,15 @@
             GEOFENCE_CONFIG.radiusEntryMeters = radiusEntry;
             GEOFENCE_CONFIG.radiusExitMeters = radiusExit;
             GEOFENCE_CONFIG.maxAccuracyMeters = maxAccuracy;
-            persistGeofenceConfig();
+
+            const { error } = await persistGeofenceConfig();
+            if (error) {
+                showMessage(`Errore salvataggio geofence su server: ${error.message}`, true);
+                updateGeoAdminStatus("Errore salvataggio geofence su server.", true);
+                return false;
+            }
             fillGeoAdminFormFromConfig();
-            updateGeoAdminStatus("Impostazioni geofence salvate con successo.");
+            updateGeoAdminStatus("Impostazioni geofence salvate con successo (web + app).");
             return true;
         }
 
@@ -1675,6 +1744,7 @@
         // 🔹 Gestione del click sul tasto Admin fisso
         fixedAdminBtn.addEventListener("click", async () => {
             if (isAdmin) {
+                await loadGeofenceConfig();
                 showView(adminView);
                 fillGeoAdminFormFromConfig();
                 refreshMapPreview();
@@ -1724,12 +1794,12 @@
             );
         });
 
-        geoSaveSettingsBtn.addEventListener("click", () => {
+        geoSaveSettingsBtn.addEventListener("click", async () => {
             if (!isAdmin) {
                 showMessage("Solo admin possono cambiare la geofence.", true);
                 return;
             }
-            applyGeofenceConfigFromAdminForm();
+            await applyGeofenceConfigFromAdminForm();
         });
 
         geoUseCurrentPositionBtn.addEventListener("click", () => {
@@ -2057,9 +2127,12 @@
 
 
         // 🔹 Stato autenticazione (entry point principale)
-        loadGeofenceConfig();
-        fillGeoAdminFormFromConfig();
-        refreshMapPreview();
+        async function initGeofenceConfig() {
+            await loadGeofenceConfig();
+            fillGeoAdminFormFromConfig();
+            refreshMapPreview();
+        }
+        initGeofenceConfig();
 
         supabase.auth.onAuthStateChange((event, session) => {
             updateAuthUI();
