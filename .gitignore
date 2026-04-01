@@ -18,6 +18,8 @@ backup/
 # Repo git annidato (cartella stabile aveva init locale)
 BadgeApp_stabile_netlify/.git/
 
-# Opzionale: cartelle legacy duplicate (decommenta se non le vuoi in repo)
-# BADGEAPP/
-# timbrature_app/
+# Legacy / copie locali (non in repo)
+BADGEAPP/
+timbrature_app/
+index.txt
+index_copia_copilot.txt

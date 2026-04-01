@@ -1573,7 +1573,7 @@
             if (error) {
                 console.error("employee_requests:", error);
                 employeeRequestsListEl.innerHTML =
-                    "<span style=\"color:#b91c1c;\">Impossibile caricare l'elenco. Esegui la migrazione SQL per «ferie» e verifica le policy su <code>employee_requests</code>.</span>";
+                    "<span style=\"color:#b91c1c;\">Impossibile caricare l'elenco. In Supabase → SQL Editor esegui <code>SUPABASE_SCHEMA.sql</code> (cartella web).</span>";
                 return;
             }
             if (!data || data.length === 0) {

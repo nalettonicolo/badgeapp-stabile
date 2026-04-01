@@ -1,7 +1,15 @@
 BadgeApp stabile - guida deploy GitHub + Netlify
 
 Contenuto della cartella:
-- index.html
+- index.html, supabase-config.js, netlify.toml
+
+--------------------------------------------------
+Database Supabase (obbligatorio per app web + mobile)
+--------------------------------------------------
+1) Apri il progetto su [Supabase](https://supabase.com) → **SQL Editor**.
+2) Incolla tutto il file **`SUPABASE_SCHEMA.sql`** (in questa cartella) ed esegui **Run** una volta.
+   - È idempotente: aggiunge tabelle/colonne/policy mancanti senza cancellare dati.
+   - Risolve errori tipo *column employee_requests.travel_hours does not exist* su DB creati con migrazioni vecchie.
 
 --------------------------------------------------
 STEP 1 - Crea repository GitHub
