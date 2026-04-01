@@ -1,0 +1,10 @@
+---
+description: Deploy BadgeApp via GitHub → Netlify (not CLI)
+alwaysApply: true
+---
+
+# Deploy BadgeApp
+
+- **Flusso ufficiale**: le modifiche vanno **committate e pushate su GitHub**; **Netlify** è collegato al repo e fa il **deploy automatico** dopo il push.
+- **Non** proporre come passo predefinito `netlify deploy` dalla CLI locale, salvo richiesta esplicita dell’utente (es. emergenza senza Git).
+- Dopo un push, il deploy va verificato in Netlify → **Deploys** (o attendendo la build).

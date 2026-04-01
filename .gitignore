@@ -1,0 +1,23 @@
+# Dipendenze
+node_modules/
+**/node_modules/
+
+# Build / cache
+.expo/
+dist/
+build/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Backup locale (non serve in repo)
+backup/
+
+# Repo git annidato (cartella stabile aveva init locale)
+BadgeApp_stabile_netlify/.git/
+
+# Opzionale: cartelle legacy duplicate (decommenta se non le vuoi in repo)
+# BADGEAPP/
+# timbrature_app/

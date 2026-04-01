@@ -1,0 +1,77 @@
+# Pubblica il sito Netlify e pubblica un aggiornamento OTA (EAS Update) per l'app mobile
+# su ogni push su main/master che tocca web o mobile.
+#
+# Segreti GitHub da configurare (Settings → Secrets → Actions):
+#   NETLIFY_AUTH_TOKEN   — token personale Netlify
+#   NETLIFY_SITE_ID      — ID sito (Site settings → Site details)
+#   EXPO_TOKEN           — token Expo (expo.dev → Access Tokens); per EAS Update
+# Opzionale in CI per project EAS:
+#   EAS_PROJECT_ID       — UUID progetto Expo (stesso di extra.eas.projectId dopo eas init)
+
+name: Publish web + mobile OTA
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'BadgeApp_stabile_netlify/**'
+      - 'badgeapp-mobile/**'
+      - '.github/workflows/publish-web-and-mobile.yml'
+  workflow_dispatch:
+
+jobs:
+  netlify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli
+
+      - name: Deploy to Netlify (production)
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "::warning::NETLIFY_AUTH_TOKEN o NETLIFY_SITE_ID mancanti: salto deploy Netlify."
+            exit 0
+          fi
+          netlify deploy --prod --dir=BadgeApp_stabile_netlify --site="$NETLIFY_SITE_ID"
+
+  eas-update:
+    needs: netlify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: badgeapp-mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: badgeapp-mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: EAS Update (OTA)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::notice::EXPO_TOKEN non impostato: salto EAS Update (configura il secret per OTA automatici)."
+            exit 0
+          fi
+          npx eas-cli update --channel production --non-interactive --message "CI ${{ github.sha }}"

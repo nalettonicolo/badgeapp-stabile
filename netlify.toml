@@ -1,0 +1,7 @@
+# Pubblicazione sito statico (timbrature web)
+[build]
+  publish = "."
+  command = "echo Static site — nessuna build richiesta"
+
+[build.environment]
+  NODE_VERSION = "20"
