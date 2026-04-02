@@ -87,19 +87,20 @@ export async function saveWebGeofenceRules(payload: {
   }
 
   const row = currentData as GeofenceRow;
-  const upsertPayload = {
-    id: 1,
-    address: payload.address,
-    center_lat: row.center_lat,
-    center_lng: row.center_lng,
-    radius_entry_meters: payload.radiusEntryMeters,
-    radius_exit_meters: payload.radiusExitMeters,
-    max_accuracy_meters: payload.maxAccuracyMeters,
-    polygon_path: row.polygon_path ?? [],
-  };
-  const { error } = await supabase.from('geofence_settings').upsert(upsertPayload, {
-    onConflict: 'id',
-    ignoreDuplicates: false,
-  });
+  /* UPDATE evita il ramo INSERT dell’upsert: senza policy INSERT su geofence_settings Postgres dava
+   * «new row violates row-level security policy». La riga id=1 è già verificata sopra. */
+  const { error } = await supabase
+    .from('geofence_settings')
+    .update({
+      address: payload.address,
+      center_lat: row.center_lat,
+      center_lng: row.center_lng,
+      radius_entry_meters: payload.radiusEntryMeters,
+      radius_exit_meters: payload.radiusExitMeters,
+      max_accuracy_meters: payload.maxAccuracyMeters,
+      polygon_path: row.polygon_path ?? [],
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', 1);
   return { error: error ? new Error(error.message) : null };
 }

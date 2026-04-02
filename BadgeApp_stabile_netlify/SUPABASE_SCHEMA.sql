@@ -179,6 +179,21 @@ BEGIN
         )
       );
   END IF;
+
+  -- UPSERT dal client usa anche INSERT se la riga non c’è o in alcuni percorsi RLS
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'geofence_settings' AND policyname = 'geofence_insert_admin'
+  ) THEN
+    CREATE POLICY geofence_insert_admin
+      ON public.geofence_settings FOR INSERT TO authenticated
+      WITH CHECK (
+        EXISTS (
+          SELECT 1 FROM public.profiles p
+          WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
+        )
+      );
+  END IF;
 END
 $$;
 
