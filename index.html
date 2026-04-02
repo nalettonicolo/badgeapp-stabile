@@ -445,7 +445,7 @@
         <div id="monthly-summary">
             <h3>Riepilogo Mensile</h3>
             <p id="summary-total-days">Giorni Lavorati (Completi): -</p>
-            <p id="summary-total-work">Ore Lavorate Totali: -</p>
+            <p id="summary-total-work" title="Somma ore da timbrature e ore dichiarate per trasferta (prorata al mese).">Ore Lavorate Totali: -</p>
             <p id="summary-total-extra">Straordinario Totale: -</p>
         </div>
     </div>
@@ -626,6 +626,8 @@
                     </select>
                     <label for="req-travel-hours" style="font-weight: 600; margin-top: 8px; display: block;">Ore viaggio (opz.)</label>
                     <input type="number" id="req-travel-hours" min="0" step="0.5" placeholder="es. 4" />
+                    <label for="req-total-hours-declared" style="font-weight: 600; margin-top: 8px; display: block;">Ore totali dichiarate (opz., incluse viaggio)</label>
+                    <input type="number" id="req-total-hours-declared" min="0" step="0.5" placeholder="es. 8" />
                 </div>
                 <div id="req-ferie-hint" class="hidden" style="font-size: 0.85rem; color: #0f766e; background: #f0fdfa; padding: 8px 10px; border-radius: 6px;">
                     Verranno conteggiati i giorni di calendario dal «Dal» al «Al» (inclusi).
@@ -769,6 +771,7 @@
         const reqTrasfertaFields = document.getElementById("req-trasferta-fields");
         const reqTrasfertaScope = document.getElementById("req-trasferta-scope");
         const reqTravelHours = document.getElementById("req-travel-hours");
+        const reqTotalHoursDeclared = document.getElementById("req-total-hours-declared");
         const reqFerieHint = document.getElementById("req-ferie-hint");
         const reqNote = document.getElementById("req-note");
         const closeEmployeeRequestModal = document.getElementById("close-employee-request-modal");
@@ -1534,6 +1537,54 @@
             return diff >= 0 ? diff + 1 : 0;
         }
 
+        /** Giorni di trasferita che cadono nel mese (estremi inclusi, stringhe YYYY-MM-DD). */
+        function overlapDaysInMonthRange(startStr, endStr, year, month) {
+            const monthStartStr = `${year}-${String(month).padStart(2, "0")}-01`;
+            const lastDay = new Date(year, month, 0).getDate();
+            const monthEndStr = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+            const lo = startStr > monthStartStr ? startStr : monthStartStr;
+            const hi = endStr < monthEndStr ? endStr : monthEndStr;
+            if (lo > hi) return 0;
+            return inclusiveCalendarDays(lo, hi);
+        }
+
+        /**
+         * Ore da trasferta da sommare al riepilogo: se c’è total_hours_declared usa quello (già incl. viaggio),
+         * altrimenti solo travel_hours. Prorata sui giorni del mese vs durata trasferta.
+         */
+        async function fetchTrasfertaExtraMinutesForMonth(userId, year, month) {
+            const lastDay = new Date(year, month, 0).getDate();
+            const monthStartStr = `${year}-${String(month).padStart(2, "0")}-01`;
+            const monthEndStr = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+            const { data, error } = await supabase
+                .from("employee_requests")
+                .select("start_date, end_date, travel_hours, total_hours_declared")
+                .eq("user_id", userId)
+                .eq("request_type", "trasferta")
+                .lte("start_date", monthEndStr)
+                .gte("end_date", monthStartStr);
+            if (error) {
+                console.warn("Riepilogo trasferta:", error);
+                return 0;
+            }
+            let extraMin = 0;
+            for (const row of data || []) {
+                const tripDays = inclusiveCalendarDays(row.start_date, row.end_date);
+                if (tripDays <= 0) continue;
+                const overlap = overlapDaysInMonthRange(row.start_date, row.end_date, year, month);
+                if (overlap <= 0) continue;
+                const frac = overlap / tripDays;
+                const td = row.total_hours_declared;
+                const th = row.travel_hours;
+                if (td != null && Number.isFinite(Number(td)) && Number(td) > 0) {
+                    extraMin += Number(td) * 60 * frac;
+                } else if (th != null && Number.isFinite(Number(th)) && Number(th) > 0) {
+                    extraMin += Number(th) * 60 * frac;
+                }
+            }
+            return Math.round(extraMin);
+        }
+
         function openEmployeeRequestModal(type) {
             currentEmployeeRequestType = type;
             const today = getTodayDateString();
@@ -1541,6 +1592,7 @@
             reqEndDate.value = today;
             reqNote.value = "";
             reqTravelHours.value = "";
+            if (reqTotalHoursDeclared) reqTotalHoursDeclared.value = "";
             reqTrasfertaScope.value = "TI";
             if (type === "trasferta") {
                 employeeRequestModalTitle.textContent = "Registra trasferta";
@@ -1566,7 +1618,7 @@
             if (!currentUser || !employeeRequestsListEl) return;
             const { data, error } = await supabase
                 .from("employee_requests")
-                .select("id, request_type, start_date, end_date, note, status, trasferta_scope, travel_hours, created_at")
+                .select("id, request_type, start_date, end_date, note, status, trasferta_scope, travel_hours, total_hours_declared, created_at")
                 .eq("user_id", currentUser.id)
                 .order("created_at", { ascending: false })
                 .limit(25);
@@ -1712,24 +1764,31 @@
             const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
             const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-            const { data: punches, error } = await supabase
-                .from("daily_punches")
-                .select("*")
-                .eq("user_id", userId)
-                .gte("punch_date", startDate)
-                .lte("punch_date", endDate)
-                .order("punch_date", { ascending: true });
-            
+            const [punchResult, trasfertaExtraMinutes] = await Promise.all([
+                supabase
+                    .from("daily_punches")
+                    .select("*")
+                    .eq("user_id", userId)
+                    .gte("punch_date", startDate)
+                    .lte("punch_date", endDate)
+                    .order("punch_date", { ascending: true }),
+                fetchTrasfertaExtraMinutesForMonth(userId, year, month),
+            ]);
+
+            const { data: punches, error } = punchResult;
+
             if (error) {
                 console.error("ERRORE STORICO:", error);
                 punchesTableContainer.innerHTML = `<p style="text-align: center; color: #dc2626;">Errore caricamento storico: ${error.message}</p>`;
-                updateMonthlySummary(null, 0, 0, 0); // Resetta il riepilogo
+                updateMonthlySummary(null, 0, 0, 0, trasfertaExtraMinutes);
                 return;
             }
 
-            if (punches.length === 0) {
+            const list = punches || [];
+
+            if (list.length === 0) {
                 punchesTableContainer.innerHTML = '<p style="text-align: center; color: #6b7280;">Nessuna timbratura trovata per il mese selezionato.</p>';
-                updateMonthlySummary(null, 0, 0, 0); // Resetta il riepilogo
+                updateMonthlySummary(null, 0, 0, 0, trasfertaExtraMinutes);
                 return;
             }
 
@@ -1754,7 +1813,7 @@
             let completedDays = 0;
             let totalPositiveExtraMinutes = 0;
             
-            punches.forEach(punch => {
+            list.forEach(punch => {
                 const workMinutes = calculateWorkMinutes(punch);
                 let extraMinutes = 0;
                 // Condizioni per considerare un giorno come 'completo' e idoneo al calcolo straordinario:
@@ -1798,20 +1857,20 @@
             tableHtml += '</tbody></table>';
             punchesTableContainer.innerHTML = tableHtml;
 
-            // Passa il nuovo totale degli straordinari positivi al riepilogo
-            updateMonthlySummary(punches, totalWorkMinutes, completedDays, totalPositiveExtraMinutes);
+            // Timbrature + ore trasferta (viaggio / totali dichiarati, prorata al mese)
+            updateMonthlySummary(list, totalWorkMinutes, completedDays, totalPositiveExtraMinutes, trasfertaExtraMinutes);
         }
 
         // Funzione modificata: eliminato il calcolo e la visualizzazione della media giornaliera
-        function updateMonthlySummary(punches, totalWorkMinutes = 0, completedDays = 0, totalPositiveExtraMinutes = 0) {
+        function updateMonthlySummary(punches, totalWorkMinutes = 0, completedDays = 0, totalPositiveExtraMinutes = 0, trasfertaExtraMinutes = 0) {
             const totalExtraMinutes = totalPositiveExtraMinutes;
-            // Usa solo il totale positivo per il riepilogo
-            const totalWorkHHMM = minutesToHHMM(totalWorkMinutes);
+            const combinedWorkMinutes = totalWorkMinutes + trasfertaExtraMinutes;
+            const totalWorkHHMM = minutesToHHMM(combinedWorkMinutes);
             const totalExtraHHMM = minutesToHHMM(totalExtraMinutes);
-            
-            // La logica per la media giornaliera è stata rimossa
+
             summaryTotalDays.textContent = `Giorni Lavorati (Completi): ${completedDays}`;
-            summaryTotalWork.textContent = `Ore Lavorate Totali: ${totalWorkHHMM}`;
+            const workSuffix = trasfertaExtraMinutes > 0 ? " (timbrature + trasferta)" : "";
+            summaryTotalWork.textContent = `Ore Lavorate Totali: ${totalWorkHHMM}${workSuffix}`;
             summaryTotalExtra.textContent = `Straordinario Totale: ${totalExtraHHMM}`;
         }
 
@@ -2019,6 +2078,8 @@
                 payload.trasferta_scope = reqTrasfertaScope.value || "TI";
                 const th = parseFloat(reqTravelHours.value);
                 if (!Number.isNaN(th) && th >= 0) payload.travel_hours = th;
+                const td = reqTotalHoursDeclared ? parseFloat(reqTotalHoursDeclared.value) : NaN;
+                if (!Number.isNaN(td) && td >= 0) payload.total_hours_declared = td;
             }
             const { error } = await supabase.from("employee_requests").insert(payload);
             if (error) {
