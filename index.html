@@ -208,12 +208,33 @@
         #monthly-summary h3 { font-size: 1.25rem; margin-bottom: 10px;
         }
         
-        /* Controlli storico Admin */
+        /* Periodo storico (sempre visibile) + riga admin opzionale */
+        #history-month-controls {
+            margin-bottom: 15px;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+        }
+        #history-month-controls label {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+            color: #334155;
+        }
+        #history-month-controls select {
+            max-width: 100%;
+            font-size: 1rem;
+        }
         #admin-history-controls {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-end;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
+            min-height: 0;
+        }
+        #admin-history-controls.hidden {
+            display: none;
         }
 
         /* ------------------------------------------------
@@ -426,20 +447,19 @@
             </div>
         </div>
         
-        <div id="admin-history-controls">
-            <div style="max-width: 300px;">
-                <label for="month-select" style="font-weight: 600;
-                    display: block; margin-bottom: 5px;">Seleziona Mese:</label>
-                <select id="month-select"></select>
-            </div>
+        <div id="history-month-controls">
+            <label for="month-select">Periodo (mese e anno)</label>
+            <select id="month-select" aria-label="Seleziona mese e anno per lo storico"></select>
+        </div>
+        <div id="admin-history-controls" class="hidden">
             <p id="current-admin-name" style="font-weight: 600;
-                color: #3b82f6;"></p>
+                color: #3b82f6; margin: 0;"></p>
         </div>
 
 
         <div id="punches-table-container">
             <p style="text-align: center;
-                color: #6b7280;">Seleziona il mese per caricare lo storico.</p>
+                color: #6b7280;">Caricamento storico…</p>
         </div>
 
         <div id="monthly-summary">
@@ -1985,6 +2005,10 @@
                     currentHistoryUserId = userId; 
                     historyTitlePrefixEl.textContent = "Storico Admin per:";
                     adminHistoryControlsEl.classList.remove("hidden");
+                    const adminNameLine = document.getElementById("current-admin-name");
+                    if (adminNameLine) {
+                        adminNameLine.textContent = userName ? `Dipendente: ${userName}` : "";
+                    }
                     
                     // Popola il selettore dei mesi prima di mostrare la vista
                     populateMonthSelect();
@@ -2230,19 +2254,18 @@
         // 🔹 Logica Interfaccia Utente (UI) CRITICA
         // ------------------------------------------------
         
-        // Funzione per popolare il selettore Mese/Anno (richiesta dall'utente)
+        // Funzione per popolare il selettore Mese/Anno (valore YYYY-MM)
         function populateMonthSelect() {
             const today = new Date();
             monthSelect.innerHTML = '';
-            // Popola con gli ultimi 12 mesi
-            for (let i = 0; i < 12; i++) {
+            const monthsBack = 36;
+            for (let i = 0; i < monthsBack; i++) {
                 const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
                 const monthYearString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
                 const displayMonth = date.toLocaleDateString('it-IT', { year: 'numeric', month: 'long' });
-                
                 const option = document.createElement('option');
                 option.value = monthYearString;
-                option.textContent = displayMonth;
+                option.textContent = displayMonth.charAt(0).toUpperCase() + displayMonth.slice(1);
                 monthSelect.appendChild(option);
             }
         }
