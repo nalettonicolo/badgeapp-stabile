@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../App';
+import { BackToTimbratureButton } from '../components/BackToTimbratureButton';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { base, colors, layout, radius, shadow, space, typography } from '../lib/theme';
@@ -148,9 +149,7 @@ export default function RequestsScreen() {
           <Text style={styles.title}>Trasferte, malattie e ferie</Text>
           <Text style={styles.headerSub}>Salvataggio locale su database aziendale</Text>
         </View>
-        <Pressable style={styles.closePill} onPress={() => navigation.goBack()}>
-          <Text style={styles.closePillText}>Chiudi</Text>
-        </Pressable>
+        <BackToTimbratureButton navigation={navigation} compact />
       </View>
 
       {toast ? (
@@ -325,6 +324,7 @@ export default function RequestsScreen() {
             ))
           )}
         </View>
+        <BackToTimbratureButton navigation={navigation} />
       </ScrollView>
     </SafeAreaView>
   );

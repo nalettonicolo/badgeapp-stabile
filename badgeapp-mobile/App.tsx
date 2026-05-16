@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Updates from 'expo-updates';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { colors } from './lib/theme';
@@ -29,6 +29,7 @@ function RootNavigator() {
     return (
       <View style={styles.boot}>
         <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.bootText}>Caricamento…</Text>
       </View>
     );
   }
@@ -87,5 +88,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bg,
+    gap: 12,
   },
+  bootText: { fontSize: 15, color: colors.textSecondary, fontWeight: '500' },
 });

@@ -237,6 +237,33 @@
             display: none;
         }
 
+        /* Pulsante fisso in basso: torna alle timbrature (sempre visibile sullo scroll) */
+        .nav-footer-timbrature {
+            position: sticky;
+            bottom: 0;
+            z-index: 15;
+            margin-top: 20px;
+            padding: 14px 0 8px;
+            background: linear-gradient(to top, #ffffff 70%, rgba(255, 255, 255, 0));
+        }
+        .btn-timbrature {
+            width: 100%;
+            max-width: 420px;
+            margin: 0 auto;
+            display: block;
+            background-color: #4b5563;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+        }
+        .btn-timbrature:hover {
+            opacity: 0.92;
+        }
+
         /* ------------------------------------------------
          * 3. Media Query (Layout Desktop/Tablet)
          * ------------------------------------------------ */
@@ -294,8 +321,14 @@
 
     <button id="fixed-admin-btn" class="hidden">Admin</button>
 
-    <div id="loading-view">
-        <p style="font-size: 1.125rem; color: #4b5563;">Caricamento in corso...</p>
+    <div id="loading-view" style="text-align: center; max-width: 22rem; padding: 24px 16px;">
+        <p style="font-size: 1.125rem; color: #4b5563; margin: 0 0 8px;">Caricamento in corso…</p>
+        <p id="loading-slow-hint" class="hidden" style="font-size: 0.875rem; color: #6b7280; margin: 0 0 12px;">
+            Sta impiegando più del previsto. Controlla la connessione.
+        </p>
+        <button type="button" id="loading-retry-btn" class="hidden btn-timbrature" style="max-width: 200px; margin: 0 auto;">
+            Riprova
+        </button>
     </div>
 
     <div id="login-view" class="hidden">
@@ -442,8 +475,7 @@
                 </button>
             </div>
             <div class="view-controls">
-                 <button id="back-from-history-btn" style="background-color: #4b5563;
-                    color: white;">Indietro</button>
+                 <button type="button" id="back-from-history-btn" class="btn-timbrature" style="max-width: 220px; padding: 10px 14px;">Torna alle timbrature</button>
             </div>
         </div>
         
@@ -468,6 +500,9 @@
             <p id="summary-total-work" title="Somma ore da timbrature e ore dichiarate per trasferta (prorata al mese).">Ore Lavorate Totali: -</p>
             <p id="summary-total-extra">Straordinario Totale: -</p>
         </div>
+        <div class="nav-footer-timbrature">
+            <button type="button" id="back-from-history-footer-btn" class="btn-timbrature">Torna alle timbrature</button>
+        </div>
     </div>
 
     
@@ -475,8 +510,7 @@
         <div class="view-header">
             <h2 style="color: #1f2937;">Pannello di Amministrazione</h2>
             <div class="view-controls">
-                 <button id="back-from-admin-btn" style="background-color: #4b5563;
-                    color: white;">Torna alle timbrature</button>
+                 <button type="button" id="back-from-admin-btn" class="btn-timbrature" style="max-width: 260px; padding: 10px 14px;">Torna alle timbrature</button>
             </div>
         </div>
 
@@ -550,6 +584,9 @@
             <ul id="profiles-ul">
                 <li style="color: #6b7280;">Caricamento...</li>
             </ul>
+        </div>
+        <div class="nav-footer-timbrature">
+            <button type="button" id="back-from-admin-footer-btn" class="btn-timbrature">Torna alle timbrature</button>
         </div>
     </div>
 
@@ -731,8 +768,9 @@
         const summaryTotalWork = document.getElementById("summary-total-work");
         const summaryTotalExtra = document.getElementById("summary-total-extra");
         const fixedAdminBtn = document.getElementById("fixed-admin-btn");
-        const backFromAdminBtn = document.getElementById("back-from-admin-btn"); 
-        
+        const backFromAdminBtn = document.getElementById("back-from-admin-btn");
+        const backFromHistoryFooterBtn = document.getElementById("back-from-history-footer-btn");
+        const backFromAdminFooterBtn = document.getElementById("back-from-admin-footer-btn");
 
         // Timbratura Manuale DOM
         const manualPunchModal = document.getElementById("manual-punch-modal");
@@ -821,8 +859,13 @@
         let currentUser = null;
         let passwordRecoveryActive = false;
         let punchesData = {}; 
-        let nextPunchIndex = 0; 
-        let isAdmin = false; 
+        let nextPunchIndex = 0;
+        let isAdmin = false;
+        let hasInitializedAppView = false;
+        let authUiBusy = false;
+        let loadPunchesGen = 0;
+        let loadHistoryGen = 0;
+        let monthSelectDebounce = null;
         let currentHistoryUserId = null;
         let geoWatchId = null;
         let autoPunchInProgress = false;
@@ -912,11 +955,25 @@
             } else if (viewToShow && viewToShow.id) {
                 sessionStorage.setItem(VIEW_STORAGE_KEY, viewToShow.id);
             }
-            // Logica Tasto Admin Fisso: Mostra solo se l'utente è Admin e non è nella pagina di Login
-            if (viewToShow === punchView && isAdmin) {
-                 fixedAdminBtn.classList.remove("hidden");
+            // Tasto flottante: visibile sulla home timbrature se loggato
+            if (viewToShow === punchView && currentUser) {
+                fixedAdminBtn.classList.remove("hidden");
             } else {
-                 fixedAdminBtn.classList.add("hidden");
+                fixedAdminBtn.classList.add("hidden");
+            }
+        }
+
+        /** Aggiorna solo i dati della vista corrente (senza cambiare schermata) */
+        function refreshCurrentViewData() {
+            if (!currentUser) return;
+            if (!punchView.classList.contains("hidden")) {
+                loadPunches();
+            } else if (!historyView.classList.contains("hidden")) {
+                const userId = currentHistoryUserId || currentUser.id;
+                const userName = historyUserDisplayEl.textContent.trim() || "Personale";
+                loadPunchesHistory(userId, monthSelect.value, userName);
+            } else if (!adminView.classList.contains("hidden") && isAdmin) {
+                loadAllProfiles();
             }
         }
 
@@ -1499,6 +1556,7 @@
 
         async function loadPunches() {
             if (!currentUser) return;
+            const gen = ++loadPunchesGen;
             const today = getTodayDateString();
             const { data, error } = await supabase
                 .from("daily_punches")
@@ -1506,8 +1564,12 @@
                 .eq("user_id", currentUser.id)
                 .eq("punch_date", today)
                 .maybeSingle();
+            if (gen !== loadPunchesGen) return;
             if (error) {
                 console.error("ERRORE: Impossibile caricare le timbrature odierne:", error);
+                timbraMessageEl.textContent = isLikelyNetworkError(error)
+                    ? "Connessione assente. Riprova tra poco."
+                    : "Errore caricamento timbrature odierne.";
                 loadMyEmployeeRequests();
                 return;
             }
@@ -1771,19 +1833,60 @@
             return { error };
         }
         
+        function ensureMonthSelectPopulated() {
+            if (!monthSelect || monthSelect.options.length === 0) {
+                populateMonthSelect();
+            }
+            if (monthSelect && monthSelect.options.length > 0 && !monthSelect.value) {
+                monthSelect.selectedIndex = 0;
+            }
+        }
+
         /** * Funzione Unificata per caricare lo storico di un utente specifico
          */
         async function loadPunchesHistory(userId, monthYear, userName = '') {
-            if (!userId) { 
+            if (!userId) {
                 punchesTableContainer.innerHTML = '<p style="text-align: center; color: #dc2626;">Errore: ID Utente mancante.</p>';
-                return; 
+                return;
             }
+            const historyGen = ++loadHistoryGen;
+            ensureMonthSelectPopulated();
+            let my = monthYear != null ? String(monthYear).trim() : "";
+            if (!my || !/^\d{4}-\d{2}$/.test(my)) {
+                my = monthSelect.value || "";
+            }
+            if (!my || !/^\d{4}-\d{2}$/.test(my)) {
+                punchesTableContainer.innerHTML =
+                    '<p style="text-align: center; color: #dc2626;">Seleziona un periodo (mese/anno) nel menu sopra.</p>';
+                updateMonthlySummary(null, 0, 0, 0, 0);
+                return;
+            }
+
             punchesTableContainer.innerHTML = '<p style="text-align: center; color: #4b5563;">Caricamento storico...</p>';
             historyUserDisplayEl.textContent = userName;
-            const [year, month] = monthYear.split('-').map(Number);
-            const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
-            const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
+            const [year, month] = my.split("-").map(Number);
+            if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+                punchesTableContainer.innerHTML =
+                    '<p style="text-align: center; color: #dc2626;">Periodo non valido.</p>';
+                updateMonthlySummary(null, 0, 0, 0, 0);
+                return;
+            }
+
+            let startDate;
+            let endDate;
+            try {
+                startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
+                endDate = new Date(year, month, 0).toISOString().split("T")[0];
+            } catch (e) {
+                console.error("loadPunchesHistory date:", e);
+                punchesTableContainer.innerHTML =
+                    '<p style="text-align: center; color: #dc2626;">Impossibile calcolare le date del periodo.</p>';
+                updateMonthlySummary(null, 0, 0, 0, 0);
+                return;
+            }
+
+            try {
             const [punchResult, trasfertaExtraMinutes] = await Promise.all([
                 supabase
                     .from("daily_punches")
@@ -1794,6 +1897,7 @@
                     .order("punch_date", { ascending: true }),
                 fetchTrasfertaExtraMinutesForMonth(userId, year, month),
             ]);
+            if (historyGen !== loadHistoryGen) return;
 
             const { data: punches, error } = punchResult;
 
@@ -1879,6 +1983,12 @@
 
             // Timbrature + ore trasferta (viaggio / totali dichiarati, prorata al mese)
             updateMonthlySummary(list, totalWorkMinutes, completedDays, totalPositiveExtraMinutes, trasfertaExtraMinutes);
+            } catch (err) {
+                console.error("loadPunchesHistory:", err);
+                punchesTableContainer.innerHTML =
+                    '<p style="text-align: center; color: #dc2626;">Errore caricamento storico. Controlla la connessione e riprova.</p>';
+                updateMonthlySummary(null, 0, 0, 0, 0);
+            }
         }
 
         // Funzione modificata: eliminato il calcolo e la visualizzazione della media giornaliera
@@ -1894,66 +2004,87 @@
             summaryTotalExtra.textContent = `Straordinario Totale: ${totalExtraHHMM}`;
         }
 
-        async function updateAuthUI() {
-            if (passwordRecoveryActive) {
-                loadingView.classList.add("hidden");
-                loginView.classList.add("hidden");
-                punchView.classList.add("hidden");
-                historyView.classList.add("hidden");
-                adminView.classList.add("hidden");
-                recoveryPasswordModal.classList.remove("hidden");
-                fixedAdminBtn.classList.add("hidden");
-                return;
-            }
-            recoveryPasswordModal.classList.add("hidden");
-
-            const { data: { session } } = await supabase.auth.getSession();
-            const isAuthenticated = !!session;
-            
-            if (isAuthenticated) {
-                currentUser = session.user;
-                // Carica il profilo
-                const { data: profileData, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('first_name, last_name, is_admin')
-                    .eq('id', currentUser.id)
-                    .maybeSingle();
-
-                if (profileError) {
-                    console.error("ERRORE Caricamento Profilo:", profileError);
-                    const netErr = isLikelyNetworkError(profileError);
-                    showMessage(
-                        netErr
-                            ? "Connessione a Supabase non disponibile. Controlla rete o riattiva il progetto su supabase.com."
-                            : "Errore caricamento profilo. (Verifica policy RLS sulla tabella profiles)",
-                        true
-                    );
-                    isAdmin = false;
-                    const meta = currentUser.user_metadata || {};
-                    userNameEl.textContent =
-                        (typeof meta.full_name === "string" && meta.full_name) ||
-                        (typeof meta.name === "string" && meta.name) ||
-                        (currentUser.email ? currentUser.email.split("@")[0] : "Utente");
-                    userEmailEl.textContent = currentUser.email || "";
-                    fixedAdminBtn.textContent = "Storico Personale";
-                } else {
-                    const fullName = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : currentUser.email;
-                    isAdmin = profileData?.is_admin || false;
-
-                    userNameEl.textContent = fullName;
-                    userEmailEl.textContent = currentUser.email;
-                    fixedAdminBtn.textContent = isAdmin ? "Admin" : "Storico Personale"; 
+        async function updateAuthUI(authEvent = "UNKNOWN") {
+            if (authUiBusy) return;
+            authUiBusy = true;
+            try {
+                if (passwordRecoveryActive) {
+                    loadingView.classList.add("hidden");
+                    loginView.classList.add("hidden");
+                    punchView.classList.add("hidden");
+                    historyView.classList.add("hidden");
+                    adminView.classList.add("hidden");
+                    recoveryPasswordModal.classList.remove("hidden");
+                    fixedAdminBtn.classList.add("hidden");
+                    return;
                 }
+                recoveryPasswordModal.classList.add("hidden");
 
+                const { data: { session } } = await supabase.auth.getSession();
+                const isAuthenticated = !!session;
 
-                restoreViewAfterLogin();
+                if (isAuthenticated) {
+                    currentUser = session.user;
+                    const { data: profileData, error: profileError } = await supabase
+                        .from('profiles')
+                        .select('first_name, last_name, is_admin')
+                        .eq('id', currentUser.id)
+                        .maybeSingle();
 
-            } else {
-                currentUser = null;
-                isAdmin = false;
-                showView(loginView);
+                    if (profileError) {
+                        console.error("ERRORE Caricamento Profilo:", profileError);
+                        const netErr = isLikelyNetworkError(profileError);
+                        showMessage(
+                            netErr
+                                ? "Connessione a Supabase non disponibile. Controlla rete o riattiva il progetto su supabase.com."
+                                : "Errore caricamento profilo. (Verifica policy RLS sulla tabella profiles)",
+                            true
+                        );
+                        isAdmin = false;
+                        const meta = currentUser.user_metadata || {};
+                        userNameEl.textContent =
+                            (typeof meta.full_name === "string" && meta.full_name) ||
+                            (typeof meta.name === "string" && meta.name) ||
+                            (currentUser.email ? currentUser.email.split("@")[0] : "Utente");
+                        userEmailEl.textContent = currentUser.email || "";
+                        fixedAdminBtn.textContent = "Storico Personale";
+                    } else {
+                        const fullName = profileData ? `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim() : currentUser.email;
+                        isAdmin = profileData?.is_admin || false;
+
+                        userNameEl.textContent = fullName;
+                        userEmailEl.textContent = currentUser.email;
+                        fixedAdminBtn.textContent = isAdmin ? "Admin" : "Storico";
+                    }
+
+                    const shouldRestoreView =
+                        !hasInitializedAppView ||
+                        authEvent === "SIGNED_IN" ||
+                        authEvent === "INITIAL_SESSION";
+                    if (shouldRestoreView) {
+                        hasInitializedAppView = true;
+                        restoreViewAfterLogin();
+                    } else {
+                        refreshCurrentViewData();
+                    }
+                } else {
+                    currentUser = null;
+                    isAdmin = false;
+                    hasInitializedAppView = false;
+                    showView(loginView);
+                }
+            } catch (err) {
+                console.error("updateAuthUI:", err);
+                showMessage("Errore avvio. Ricarica la pagina o verifica la connessione.", true);
+                try {
+                    showView(loginView);
+                } catch (_) { /* ignore */ }
+            } finally {
+                authUiBusy = false;
+                loadingView.classList.add("hidden");
+                document.getElementById("loading-slow-hint")?.classList.add("hidden");
+                document.getElementById("loading-retry-btn")?.classList.add("hidden");
             }
-            loadingView.classList.add("hidden");
         }
         
         async function loadAllProfiles(filter = 'all') {
@@ -2280,10 +2411,23 @@
                 refreshMapWhenAdminPanelVisible();
                 await loadAllProfiles();
             } else {
-                showMessage("Funzionalità riservata agli amministratori.", true);
+                currentHistoryUserId = null;
+                historyTitlePrefixEl.textContent = "Storico Timbrature";
+                historyUserDisplayEl.textContent = "Personale";
+                adminHistoryControlsEl.classList.add("hidden");
+                populateMonthSelect();
+                showView(historyView);
+                loadPunchesHistory(currentUser.id, monthSelect.value, "Personale");
             }
         });
-        backFromAdminBtn.addEventListener("click", () => showView(punchView));
+        function goBackFromAdminToPunch() {
+            showView(punchView);
+            loadPunches();
+        }
+        backFromAdminBtn.addEventListener("click", goBackFromAdminToPunch);
+        if (backFromAdminFooterBtn) {
+            backFromAdminFooterBtn.addEventListener("click", goBackFromAdminToPunch);
+        }
 
         geoToggleBtn.addEventListener("click", () => {
             if (!currentUser) {
@@ -2497,19 +2641,27 @@
             loadPunchesHistory(currentUser.id, monthSelect.value, 'Personale');
         });
         
-        // Listener per cambio mese nello storico
-        monthSelect.addEventListener('change', (e) => {
-            const userId = currentHistoryUserId || currentUser.id;
-            const userName = historyUserDisplayEl.textContent;
-            loadPunchesHistory(userId, e.target.value, userName);
+        // Listener per cambio mese nello storico (debounced)
+        monthSelect.addEventListener("change", (e) => {
+            if (!currentUser) return;
+            clearTimeout(monthSelectDebounce);
+            monthSelectDebounce = setTimeout(() => {
+                const userId = currentHistoryUserId || currentUser.id;
+                const userName = historyUserDisplayEl.textContent;
+                loadPunchesHistory(userId, e.target.value, userName);
+            }, 300);
         });
 
-        // Tasto Indietro da Storico
-        backFromHistoryBtn.addEventListener("click", () => {
+        // Tasto Indietro da Storico (header + footer)
+        function goBackFromHistoryToPunch() {
             currentHistoryUserId = null;
             showView(punchView);
             loadPunches();
-        });
+        }
+        backFromHistoryBtn.addEventListener("click", goBackFromHistoryToPunch);
+        if (backFromHistoryFooterBtn) {
+            backFromHistoryFooterBtn.addEventListener("click", goBackFromHistoryToPunch);
+        }
         
         // 🔹 Login e Logout 
          document.getElementById("login-form").addEventListener("submit", async (e) => {
@@ -2704,12 +2856,33 @@
             await updateAuthUI();
         });
 
-        supabase.auth.onAuthStateChange(async (event, session) => {
+        supabase.auth.onAuthStateChange(async (event) => {
             if (event === "PASSWORD_RECOVERY") {
                 passwordRecoveryActive = true;
             }
-            await updateAuthUI();
+            if (event === "SIGNED_OUT") {
+                passwordRecoveryActive = false;
+                hasInitializedAppView = false;
+            }
+            await updateAuthUI(event);
         });
+
+        const loadingSlowHint = document.getElementById("loading-slow-hint");
+        const loadingRetryBtn = document.getElementById("loading-retry-btn");
+        setTimeout(() => {
+            if (!loadingView.classList.contains("hidden")) {
+                loadingSlowHint?.classList.remove("hidden");
+                loadingRetryBtn?.classList.remove("hidden");
+            }
+        }, 12000);
+        loadingRetryBtn?.addEventListener("click", () => {
+            loadingView.classList.remove("hidden");
+            loadingSlowHint?.classList.add("hidden");
+            loadingRetryBtn?.classList.add("hidden");
+            void updateAuthUI("INITIAL_SESSION");
+        });
+
+        void updateAuthUI("INITIAL_SESSION");
 
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState !== "visible" || !currentUser) return;

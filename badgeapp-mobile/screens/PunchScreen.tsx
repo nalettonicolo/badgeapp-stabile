@@ -55,6 +55,7 @@ export default function PunchScreen() {
   const lastAutoRef = useRef(0);
   const autoBusyRef = useRef(false);
   const insideSinceRef = useRef<number | null>(null);
+  const geoConfigRef = useRef<GeofenceConfig | null>(null);
 
   const [manualOpen, setManualOpen] = useState(false);
   const [manualField, setManualField] = useState<(typeof PUNCH_STEPS)[number]['field']>('iniziomattina');
@@ -98,9 +99,10 @@ export default function PunchScreen() {
         showToast(`Geofence: ${error.message}`, true);
         return;
       }
+      geoConfigRef.current = data;
       setGeoConfig(data);
     });
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     return () => {
@@ -158,6 +160,7 @@ export default function PunchScreen() {
       showToast(`Errore geofence web: ${geofenceError.message}`, true);
       return;
     }
+    geoConfigRef.current = cfg;
     setGeoConfig(cfg);
     if (!cfg || !isGeofenceConfigured(cfg)) {
       showToast(
@@ -190,7 +193,7 @@ export default function PunchScreen() {
         if (Date.now() - lastAutoRef.current < 90000) return;
 
         const { latitude, longitude, accuracy } = loc.coords;
-        const { data: g } = await fetchWebGeofenceConfig();
+        const g = geoConfigRef.current;
         if (!g || !isGeofenceConfigured(g)) {
           setGeoStatus('Geofence web non configurata.');
           return;

@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../App';
+import { BackToTimbratureButton } from '../components/BackToTimbratureButton';
 import { useAuth } from '../context/AuthContext';
 import { fetchWebGeofenceConfig, saveWebGeofenceRules } from '../lib/serverGeofence';
 import { supabase } from '../lib/supabase';
@@ -139,9 +140,7 @@ export default function AdminScreen() {
         <View style={styles.deniedWrap}>
           <Text style={styles.deniedTitle}>Area amministrazione</Text>
           <Text style={styles.deniedText}>Accesso negato: account non amministratore.</Text>
-          <Pressable style={styles.deniedBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.deniedBtnText}>Indietro</Text>
-          </Pressable>
+          <BackToTimbratureButton navigation={navigation} />
         </View>
       </SafeAreaView>
     );
@@ -154,9 +153,7 @@ export default function AdminScreen() {
           <Text style={styles.headerTitle}>Admin</Text>
           <Text style={styles.headerSub}>Utenti e regole GPS (no posizione sede)</Text>
         </View>
-        <Pressable style={styles.closePill} onPress={() => navigation.goBack()}>
-          <Text style={styles.closePillText}>Chiudi</Text>
-        </Pressable>
+        <BackToTimbratureButton navigation={navigation} compact />
       </View>
 
       {toast ? (
@@ -270,6 +267,7 @@ export default function AdminScreen() {
               <Text style={styles.saveBtnText}>Salva regole GPS</Text>
             </Pressable>
           </View>
+          <BackToTimbratureButton navigation={navigation} />
         </ScrollView>
       )}
     </SafeAreaView>

@@ -1,0 +1,7 @@
+{
+  "name": "badgeapp",
+  "private": true,
+  "scripts": {
+    "backtest": "node scripts/backtest.mjs"
+  }
+}
