@@ -7,7 +7,7 @@
  * Esempio: https://nome-sito.netlify.app
  * Poi in Supabase → Authentication → URL Configuration aggiungi lo stesso URL in «Redirect URLs».
  */
-window.__BADGEAPP_PUBLIC_URL__ = "";
+window.__BADGEAPP_PUBLIC_URL__ = "https://timbratureonline.netlify.app";
 
 window.__BADGEAPP_SUPABASE__ = {
   url: "https://pobrjdrqpzerjlcqnpra.supabase.co",
