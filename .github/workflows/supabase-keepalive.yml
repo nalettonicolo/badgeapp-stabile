@@ -1,5 +1,10 @@
 name: Supabase Keepalive
 
+# Evita che il progetto Supabase free vada in pausa per inattività.
+# Secret richiesti (Settings → Secrets and variables → Actions → Repository secrets):
+#   SUPABASE_URL       → https://pobrjdrqpzerjlcqnpra.supabase.co
+#   SUPABASE_ANON_KEY  → chiave anon/public da Supabase → Project Settings → API
+
 on:
   schedule:
     - cron: "0 6 */6 * *"
@@ -8,26 +13,50 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    environment: SUPABASE_URL
     steps:
       - name: Ping Supabase REST API
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "Missing SUPABASE_URL or SUPABASE_ANON_KEY secret"
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "::error::Secret mancanti. Aggiungi in GitHub:"
+            echo "  Repository → Settings → Secrets and variables → Actions"
+            echo "  • SUPABASE_URL (es. https://pobrjdrqpzerjlcqnpra.supabase.co)"
+            echo "  • SUPABASE_ANON_KEY (anon key da Supabase Dashboard → API)"
+            echo ""
+            echo "Non usare un Environment separato a meno che non ci copi gli stessi secret."
             exit 1
           fi
+
+          BASE="${SUPABASE_URL%/}"
 
           HTTP_CODE=$(curl -sS -o /tmp/keepalive_response.json -w "%{http_code}" \
-            "$SUPABASE_URL/rest/v1/profiles?select=id&limit=1" \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+            "${BASE}/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            --connect-timeout 20 \
+            --max-time 45)
 
-          echo "Supabase keepalive HTTP code: $HTTP_CODE"
-          cat /tmp/keepalive_response.json || true
+          echo "Supabase keepalive HTTP code: ${HTTP_CODE}"
+          head -c 500 /tmp/keepalive_response.json 2>/dev/null || true
+          echo ""
 
-          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 500 ]; then
-            exit 1
-          fi
+          case "${HTTP_CODE}" in
+            200|401|403|406)
+              echo "OK: API raggiungibile (codice ${HTTP_CODE})."
+              ;;
+            502|503|504)
+              echo "::error::Supabase non disponibile (${HTTP_CODE}). Il progetto potrebbe essere in pausa: riattivalo su supabase.com/dashboard."
+              exit 1
+              ;;
+            *)
+              if [ "${HTTP_CODE}" -lt 200 ] 2>/dev/null || [ "${HTTP_CODE}" -ge 500 ] 2>/dev/null; then
+                echo "::error::Ping fallito con HTTP ${HTTP_CODE}"
+                exit 1
+              fi
+              echo "OK: risposta HTTP ${HTTP_CODE} (progetto attivo)."
+              ;;
+          esac
