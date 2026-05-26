@@ -21,8 +21,6 @@ export const colors = {
   warning: '#b45309',
   warningBg: '#fffbeb',
   warningBorder: '#fde68a',
-  geo: '#ea580c',
-  geoMuted: '#fff7ed',
   overlay: 'rgba(15, 23, 42, 0.55)',
 } as const;
 

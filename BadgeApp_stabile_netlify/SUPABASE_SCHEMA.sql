@@ -128,77 +128,7 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
 
 -- -----------------------------------------------------------------------------
--- 1) Geofence (web + mobile)
--- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.geofence_settings (
-  id integer PRIMARY KEY,
-  address text DEFAULT '',
-  center_lat double precision NOT NULL DEFAULT 0,
-  center_lng double precision NOT NULL DEFAULT 0,
-  radius_entry_meters double precision NOT NULL DEFAULT 120,
-  radius_exit_meters double precision NOT NULL DEFAULT 120,
-  max_accuracy_meters double precision NOT NULL DEFAULT 60,
-  polygon_path jsonb NOT NULL DEFAULT '[]'::jsonb,
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  updated_by uuid REFERENCES auth.users (id) ON DELETE SET NULL
-);
-
-INSERT INTO public.geofence_settings (id)
-VALUES (1)
-ON CONFLICT (id) DO NOTHING;
-
-ALTER TABLE public.geofence_settings ENABLE ROW LEVEL SECURITY;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'geofence_settings' AND policyname = 'geofence_read_authenticated'
-  ) THEN
-    CREATE POLICY geofence_read_authenticated
-      ON public.geofence_settings FOR SELECT TO authenticated
-      USING (true);
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'geofence_settings' AND policyname = 'geofence_update_admin'
-  ) THEN
-    CREATE POLICY geofence_update_admin
-      ON public.geofence_settings FOR UPDATE TO authenticated
-      USING (
-        EXISTS (
-          SELECT 1 FROM public.profiles p
-          WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
-        )
-      )
-      WITH CHECK (
-        EXISTS (
-          SELECT 1 FROM public.profiles p
-          WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
-        )
-      );
-  END IF;
-
-  -- UPSERT dal client usa anche INSERT se la riga non c’è o in alcuni percorsi RLS
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'geofence_settings' AND policyname = 'geofence_insert_admin'
-  ) THEN
-    CREATE POLICY geofence_insert_admin
-      ON public.geofence_settings FOR INSERT TO authenticated
-      WITH CHECK (
-        EXISTS (
-          SELECT 1 FROM public.profiles p
-          WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
-        )
-      );
-  END IF;
-END
-$$;
-
--- -----------------------------------------------------------------------------
--- 2) Richieste dipendente (trasferta / malattia / ferie)
+-- 1) Richieste dipendente (trasferta / malattia / ferie)
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.employee_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -260,7 +190,7 @@ COMMENT ON COLUMN public.employee_requests.travel_hours IS 'Ore di viaggio (tras
 COMMENT ON COLUMN public.employee_requests.total_hours_declared IS 'Ore totali dichiarate in trasferta (incl. viaggio).';
 
 -- -----------------------------------------------------------------------------
--- 3) RLS employee_requests
+-- 2) RLS employee_requests
 -- -----------------------------------------------------------------------------
 DO $$
 BEGIN

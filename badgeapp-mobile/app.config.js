@@ -22,12 +22,6 @@ module.exports = {
     },
     ios: {
       supportsTablet: true,
-      infoPlist: {
-        NSLocationWhenInUseUsageDescription:
-          'La posizione serve per la timbratura automatica quando sei in sede.',
-        NSLocationAlwaysAndWhenInUseUsageDescription:
-          'La posizione serve per la timbratura automatica quando sei in sede.',
-      },
     },
     android: {
       adaptiveIcon: {
@@ -36,7 +30,6 @@ module.exports = {
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      permissions: ['ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION'],
     },
     web: {
       favicon: './assets/favicon.png',
@@ -44,15 +37,6 @@ module.exports = {
     plugins: [
       'expo-updates',
       'expo-secure-store',
-      [
-        'expo-location',
-        {
-          locationWhenInUsePermission:
-            'Consenti l’accesso alla posizione per la timbratura automatica in sede.',
-          locationAlwaysAndWhenInUsePermission:
-            'Consenti l’accesso alla posizione per la timbratura automatica in sede.',
-        },
-      ],
     ],
     extra: {
       ...(process.env.EAS_PROJECT_ID

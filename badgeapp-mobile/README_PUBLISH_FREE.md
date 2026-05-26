@@ -17,7 +17,7 @@
 1. Test continuo con Expo Go (`npm start`)
 2. Build preview Android:
    - `eas build --profile preview --platform android`
-3. Installa APK e valida login/timbrature/geofence
+3. Installa APK e valida login, timbrature, storico e richieste
 4. Quando stabile:
    - `eas build --profile production --platform android`
    - `eas build --profile production --platform ios`

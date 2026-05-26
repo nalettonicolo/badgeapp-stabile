@@ -62,19 +62,10 @@ Se vuoi preview automatiche:
 - Dopo test, fai merge
 
 --------------------------------------------------
-Geotimbratura automatica (appena integrata)
+Nota privacy posizione
 --------------------------------------------------
-Nel file index.html trovi:
-- pulsante: "Attiva Timbratura Automatica da Posizione"
-- oggetto configurazione: GEOFENCE_CONFIG
-
-Prima dell'uso imposta coordinate reali sede:
-- centerLat
-- centerLng
-- radiusEntryMeters
-- radiusExitMeters
-
-Se centerLat/centerLng restano 0, la funzione non parte (blocco di sicurezza).
+La geolocalizzazione e la geotimbratura automatica sono state rimosse dall'app.
+Restano disponibili login, timbratura standard, timbratura manuale, richieste, storico e pannello admin.
 
 --------------------------------------------------
 Workaround standby Supabase (Free)

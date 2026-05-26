@@ -8,13 +8,3 @@ export type DailyPunchRow = {
   finepomeriggio?: string | null;
   pausa_minuti?: number | null;
 };
-
-export type GeofenceConfig = {
-  address: string;
-  centerLat: number;
-  centerLng: number;
-  radiusEntryMeters: number;
-  radiusExitMeters: number;
-  maxAccuracyMeters: number;
-  polygonPath: { lat: number; lng: number }[];
-};

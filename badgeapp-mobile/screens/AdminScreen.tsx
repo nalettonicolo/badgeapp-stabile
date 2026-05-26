@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../App';
 import { BackToTimbratureButton } from '../components/BackToTimbratureButton';
 import { useAuth } from '../context/AuthContext';
-import { fetchWebGeofenceConfig, saveWebGeofenceRules } from '../lib/serverGeofence';
 import { supabase } from '../lib/supabase';
 import { base, colors, layout, radius, shadow, space, typography } from '../lib/theme';
 
@@ -31,10 +30,6 @@ export default function AdminScreen() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [isAdminField, setIsAdminField] = useState(false);
-  const [geoAddress, setGeoAddress] = useState('');
-  const [geoRIn, setGeoRIn] = useState('120');
-  const [geoROut, setGeoROut] = useState('120');
-  const [geoAcc, setGeoAcc] = useState('60');
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
 
   const showToast = useCallback((text: string, error = false) => {
@@ -44,15 +39,6 @@ export default function AdminScreen() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const { data: geo, error: geoError } = await fetchWebGeofenceConfig();
-    if (geoError) {
-      showToast(`Errore geofence: ${geoError.message}`, true);
-    }
-    setGeoAddress(geo?.address ?? '');
-    setGeoRIn(String(geo?.radiusEntryMeters ?? 120));
-    setGeoROut(String(geo?.radiusExitMeters ?? 120));
-    setGeoAcc(String(geo?.maxAccuracyMeters ?? 60));
-
     const { data, error } = await supabase
       .from('profiles')
       .select('id,email,first_name,last_name,is_admin')
@@ -105,35 +91,6 @@ export default function AdminScreen() {
     await loadData();
   }
 
-  async function saveGpsRules() {
-    const radiusEntry = Number.parseFloat(geoRIn);
-    const radiusExit = Number.parseFloat(geoROut);
-    const maxAccuracy = Number.parseFloat(geoAcc);
-    if (!Number.isFinite(radiusEntry) || radiusEntry < 10) {
-      showToast('Raggio ingresso non valido (min 10m).', true);
-      return;
-    }
-    if (!Number.isFinite(radiusExit) || radiusExit < 10) {
-      showToast('Raggio uscita non valido (min 10m).', true);
-      return;
-    }
-    if (!Number.isFinite(maxAccuracy) || maxAccuracy < 5) {
-      showToast('Precisione GPS max non valida (min 5m).', true);
-      return;
-    }
-    const { error } = await saveWebGeofenceRules({
-      address: geoAddress.trim(),
-      radiusEntryMeters: radiusEntry,
-      radiusExitMeters: radiusExit,
-      maxAccuracyMeters: maxAccuracy,
-    });
-    if (error) {
-      showToast(error.message, true);
-      return;
-    }
-    showToast('Regole GPS web salvate. Posizione sede invariata.');
-  }
-
   if (!isAdmin) {
     return (
       <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
@@ -151,7 +108,7 @@ export default function AdminScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Admin</Text>
-          <Text style={styles.headerSub}>Utenti e regole GPS (no posizione sede)</Text>
+          <Text style={styles.headerSub}>Gestione utenti e permessi</Text>
         </View>
         <BackToTimbratureButton navigation={navigation} compact />
       </View>
@@ -172,6 +129,15 @@ export default function AdminScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <View style={[styles.card, styles.heroCard]}>
+            <Text style={styles.cardTag}>PANNELLO</Text>
+            <Text style={styles.cardTitle}>Amministrazione dipendenti</Text>
+            <Text style={styles.note}>
+              Modifica anagrafiche, email e diritti admin. L'app non richiede accesso alla posizione
+              del dispositivo.
+            </Text>
+          </View>
+
           <View style={styles.card}>
             <Text style={styles.cardTag}>DIPENDENTI</Text>
             <Text style={styles.cardTitle}>Seleziona un utente</Text>
@@ -226,47 +192,6 @@ export default function AdminScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTag}>GPS</Text>
-            <Text style={styles.cardTitle}>Regole (web)</Text>
-            <Text style={styles.note}>
-              Modificabili: indirizzo, raggi, precisione. Latitudine/longitudine sede restano sul web.
-            </Text>
-            <TextInput
-              style={styles.input}
-              value={geoAddress}
-              onChangeText={setGeoAddress}
-              placeholder="Indirizzo sede"
-              placeholderTextColor={colors.textMuted}
-            />
-            <TextInput
-              style={styles.input}
-              value={geoRIn}
-              onChangeText={setGeoRIn}
-              placeholder="Raggio ingresso (m)"
-              keyboardType="number-pad"
-              placeholderTextColor={colors.textMuted}
-            />
-            <TextInput
-              style={styles.input}
-              value={geoROut}
-              onChangeText={setGeoROut}
-              placeholder="Raggio uscita (m)"
-              keyboardType="number-pad"
-              placeholderTextColor={colors.textMuted}
-            />
-            <TextInput
-              style={styles.input}
-              value={geoAcc}
-              onChangeText={setGeoAcc}
-              placeholder="Precisione max GPS (m)"
-              keyboardType="number-pad"
-              placeholderTextColor={colors.textMuted}
-            />
-            <Pressable style={styles.saveBtn} onPress={() => void saveGpsRules()}>
-              <Text style={styles.saveBtnText}>Salva regole GPS</Text>
-            </Pressable>
-          </View>
           <BackToTimbratureButton navigation={navigation} />
         </ScrollView>
       )}
@@ -301,6 +226,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     ...shadow.card,
   },
+  heroCard: { backgroundColor: colors.primaryMuted, borderColor: '#c7d2fe' },
   cardTag: { ...typography.section, marginBottom: space.xs },
   cardTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: space.md },
   userRow: {

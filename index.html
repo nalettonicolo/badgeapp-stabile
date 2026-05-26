@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Timbrature Online</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         /* ------------------------------------------------
          * 1. Stili Base e Globali
@@ -171,13 +170,6 @@
             border-bottom: 1px solid #e5e7eb;
         }
 
-        /* Leaflet: il contenitore deve riempire l’area (evita mappa grigia a una tile se il size è calcolato male) */
-        #geo-map-preview .leaflet-container {
-            width: 100%;
-            height: 100%;
-            min-height: 200px;
-        }
-        
         /* Stile per l'UID cliccabile */
         .clickable-uid {
             cursor: pointer;
@@ -312,6 +304,105 @@
                 grid-template-columns: 1fr 1fr; 
                 gap: 30px; 
             }
+        }
+
+        /* Finitura visuale: tono più professionale senza cambiare il markup operativo. */
+        :root {
+            --brand: #1d4ed8;
+            --brand-dark: #1e3a8a;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: #e2e8f0;
+            --panel: rgba(255, 255, 255, 0.94);
+        }
+        * { box-sizing: border-box; }
+        body {
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 32rem),
+                linear-gradient(135deg, #eef2ff 0%, #f8fafc 45%, #ecfeff 100%);
+        }
+        #login-view,
+        #punch-view,
+        #history-view,
+        #admin-view {
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            border-radius: 24px;
+            background: var(--panel);
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+            backdrop-filter: blur(14px);
+        }
+        #login-view h1,
+        .view-header h2 {
+            color: var(--ink) !important;
+            letter-spacing: -0.03em;
+        }
+        .view-header {
+            align-items: flex-start;
+            border-bottom-color: var(--line);
+        }
+        .view-header p,
+        #monthly-summary p,
+        #employee-requests-list,
+        .form-section p {
+            color: var(--muted) !important;
+        }
+        input,
+        select {
+            border-color: var(--line) !important;
+            border-radius: 12px !important;
+            background: #f8fafc;
+            color: var(--ink);
+            outline: none;
+        }
+        input:focus,
+        select:focus {
+            border-color: #93c5fd !important;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
+        }
+        button {
+            border-radius: 12px !important;
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.10);
+        }
+        button:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, 0.25);
+            outline-offset: 2px;
+        }
+        #timbraBtn,
+        #login-form button[type="submit"] {
+            background: linear-gradient(135deg, var(--brand), var(--brand-dark)) !important;
+        }
+        .form-section,
+        #monthly-summary,
+        #history-month-controls,
+        #punches-table-container,
+        #employee-requests-list {
+            border-color: var(--line) !important;
+            border-radius: 18px !important;
+            background: rgba(248, 250, 252, 0.78) !important;
+        }
+        #history-view table {
+            border-collapse: separate;
+            border-spacing: 0;
+            overflow: hidden;
+            border-radius: 16px;
+            background: #ffffff;
+        }
+        #history-view th {
+            background: #eff6ff;
+            color: #1e3a8a;
+        }
+        #history-view td,
+        #history-view th {
+            border-color: #e5e7eb;
+        }
+        .clickable-uid {
+            color: var(--brand);
+            text-decoration: none;
+        }
+        .nav-footer-timbrature {
+            background: linear-gradient(to top, rgba(255, 255, 255, 0.96) 70%, rgba(255, 255, 255, 0));
         }
     </style>
 </head>
@@ -451,14 +542,6 @@
                     <button type="button" id="req-ferie-btn" style="background-color: #0d9488; color: white;">Ferie</button>
                 </div>
             </div>
-            <div style="margin-top: 10px; border-top: 1px solid #bfdbfe; padding-top: 10px;">
-                <button id="geo-toggle-btn" style="background-color: #7c3aed; color: white; width: 100%;">
-                    Attiva Timbratura Automatica da Posizione
-                </button>
-                <p id="geo-status" style="text-align: center; margin-top: 0.5rem; font-size: 0.875rem; color: #4b5563;">
-                    Geolocalizzazione non attiva.
-                </p>
-            </div>
             <p id="timbra-message" style="text-align: center;
                 margin-top: 0.5rem; font-size: 0.875rem; color: #4b5563; min-height: 1.25rem;"></p>
         </div>
@@ -552,31 +635,6 @@
             </div>
         </div>
 
-        <div class="form-section" style="margin-bottom: 20px;">
-            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 15px; color: #7c3aed;">Impostazioni Timbratura da Posizione</h3>
-            <p style="font-size: 0.875rem; color: #6b7280; margin-bottom: 10px;">
-                Imposta sede e tolleranze separate per timbrature di ingresso e uscita.
-            </p>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <input type="text" id="geo-address" placeholder="Indirizzo sede (es. Via Roma 1, Milano)" />
-                <button type="button" id="geo-geocode-btn" style="background-color: #2563eb; color: white;">Trova Coordinate da Indirizzo</button>
-                <input type="text" id="geo-lat" placeholder="Latitudine (es. 45.4642)" />
-                <input type="text" id="geo-lng" placeholder="Longitudine (es. 9.1900)" />
-                <input type="number" id="geo-radius-entry" min="10" step="5" placeholder="Raggio Ingresso (metri)" />
-                <input type="number" id="geo-radius-exit" min="10" step="5" placeholder="Raggio Uscita (metri)" />
-                <input type="number" id="geo-max-accuracy" min="5" step="1" placeholder="Precisione GPS max accettata (metri)" />
-            </div>
-            <div id="geo-address-suggestions" style="margin-top: 8px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; max-height: 180px; overflow-y: auto; display: none;"></div>
-            <div id="geo-map-preview" style="margin-top: 10px; height: 260px; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; background: #f3f4f6;"></div>
-            <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <button type="button" id="geo-use-current-position-btn" style="background-color: #059669; color: white; flex: 1;">Usa Posizione Attuale</button>
-                <button type="button" id="geo-draw-polygon-btn" style="background-color: #0ea5e9; color: white; flex: 1;">Disegna Area</button>
-                <button type="button" id="geo-clear-polygon-btn" style="background-color: #ef4444; color: white; flex: 1;">Cancella Area</button>
-                <button type="button" id="geo-save-settings-btn" style="background-color: #7c3aed; color: white; flex: 1;">Salva Impostazioni Geofence</button>
-            </div>
-            <p id="geo-admin-status" style="font-size: 0.875rem; color: #4b5563; margin-top: 8px;">Impostazioni geofence non ancora salvate.</p>
-        </div>
-        
         <div style="border: 1px solid #d1d5db;
             border-radius: 12px; padding: 20px; background-color: #f9fafb;">
             <h3 style="font-size: 1.25rem;
@@ -701,7 +759,6 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -780,8 +837,6 @@
         const manualType = document.getElementById("manual-type");
         const manualDate = document.getElementById("manual-date");
         const manualTime = document.getElementById("manual-time");
-        const geoToggleBtn = document.getElementById("geo-toggle-btn");
-        const geoStatusEl = document.getElementById("geo-status");
         const addEmployeeForm = document.getElementById("add-employee-form");
         const newEmployeeFirstName = document.getElementById("new-employee-first-name");
         const newEmployeeLastName = document.getElementById("new-employee-last-name");
@@ -791,20 +846,6 @@
         const resetPasswordForm = document.getElementById("reset-password-form");
         const resetUserId = document.getElementById("reset-user-id");
         const resetNewPassword = document.getElementById("reset-new-password");
-        const geoAddressInput = document.getElementById("geo-address");
-        const geoLatInput = document.getElementById("geo-lat");
-        const geoLngInput = document.getElementById("geo-lng");
-        const geoRadiusEntryInput = document.getElementById("geo-radius-entry");
-        const geoRadiusExitInput = document.getElementById("geo-radius-exit");
-        const geoMaxAccuracyInput = document.getElementById("geo-max-accuracy");
-        const geoGeocodeBtn = document.getElementById("geo-geocode-btn");
-        const geoUseCurrentPositionBtn = document.getElementById("geo-use-current-position-btn");
-        const geoDrawPolygonBtn = document.getElementById("geo-draw-polygon-btn");
-        const geoClearPolygonBtn = document.getElementById("geo-clear-polygon-btn");
-        const geoSaveSettingsBtn = document.getElementById("geo-save-settings-btn");
-        const geoAdminStatusEl = document.getElementById("geo-admin-status");
-        const geoAddressSuggestionsEl = document.getElementById("geo-address-suggestions");
-        const geoMapPreviewEl = document.getElementById("geo-map-preview");
         
         // NUOVI Elementi DOM per Inserimento Timbrature Mancanti
         const insertPunchModal = document.getElementById("insert-punch-modal");
@@ -867,31 +908,8 @@
         let loadHistoryGen = 0;
         let monthSelectDebounce = null;
         let currentHistoryUserId = null;
-        let geoWatchId = null;
         let autoPunchInProgress = false;
-        let leafletMapInstance = null;
-        let leafletMarker = null;
-        let leafletCircleEntry = null;
-        let leafletCircleExit = null;
-        let leafletPolygon = null;
-        let leafletMapClickHandler = null;
-        let isPolygonDrawMode = false;
-        let lastAutoPunchAt = 0;
-        let addressTypingDebounce = null;
         const allViews = [loginView, punchView, historyView, adminView]; 
-
-        // Configura coordinate sede e raggio in metri.
-        const GEOFENCE_CONFIG = {
-            address: "",
-            centerLat: 0,
-            centerLng: 0,
-            radiusEntryMeters: 120,
-            radiusExitMeters: 120,
-            maxAccuracyMeters: 60,
-            polygonPath: [],
-        };
-        const GEOFENCE_STORAGE_KEY = "badgeapp-geofence-config-v1";
-        const GEOFENCE_DB_ID = 1;
 
         // Mappa gli stati con i nomi dei campi
         const punchSteps = [
@@ -993,26 +1011,11 @@
             }
             if (v === "admin-view" && isAdmin) {
                 showView(adminView);
-                fillGeoAdminFormFromConfig(true);
-                refreshMapWhenAdminPanelVisible();
                 loadAllProfiles();
                 return;
             }
             showView(punchView);
             loadPunches();
-        }
-
-        function getDistanceMeters(lat1, lon1, lat2, lon2) {
-            const toRad = (deg) => (deg * Math.PI) / 180;
-            const R = 6371000;
-            const dLat = toRad(lat2 - lat1);
-            const dLon = toRad(lon2 - lon1);
-            const a =
-                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
         }
 
         function sleep(ms) {
@@ -1070,304 +1073,6 @@
             return text.includes("row-level security") || text.includes("new row violates");
         }
 
-        function isGeofenceConfigured() {
-            return Number.isFinite(GEOFENCE_CONFIG.centerLat) &&
-                Number.isFinite(GEOFENCE_CONFIG.centerLng) &&
-                !(GEOFENCE_CONFIG.centerLat === 0 && GEOFENCE_CONFIG.centerLng === 0);
-        }
-
-        function isEntryStep(index) {
-            return index === 0 || index === 2;
-        }
-
-        function hideAddressSuggestions() {
-            geoAddressSuggestionsEl.innerHTML = "";
-            geoAddressSuggestionsEl.style.display = "none";
-        }
-
-        function renderAddressSuggestions(suggestions) {
-            if (!suggestions || suggestions.length === 0) {
-                hideAddressSuggestions();
-                return;
-            }
-            geoAddressSuggestionsEl.innerHTML = suggestions.map((item) => `
-                <button type="button" data-lat="${item.lat}" data-lng="${item.lng}" data-label="${item.display_name}" style="display:block; width:100%; text-align:left; padding:8px 10px; border:none; border-bottom:1px solid #e5e7eb; background:#fff; cursor:pointer;">
-                    ${item.display_name}
-                </button>
-            `).join("");
-            geoAddressSuggestionsEl.style.display = "block";
-        }
-
-        function isPointInsidePolygon(pointLat, pointLng, polygonPath) {
-            if (!Array.isArray(polygonPath) || polygonPath.length < 3) return false;
-            let inside = false;
-            for (let i = 0, j = polygonPath.length - 1; i < polygonPath.length; j = i++) {
-                const xi = polygonPath[i].lat;
-                const yi = polygonPath[i].lng;
-                const xj = polygonPath[j].lat;
-                const yj = polygonPath[j].lng;
-                const intersect = ((yi > pointLng) !== (yj > pointLng)) &&
-                    (pointLat < (xj - xi) * (pointLng - yi) / ((yj - yi) || 1e-12) + xi);
-                if (intersect) inside = !inside;
-            }
-            return inside;
-        }
-
-        async function ensureGoogleMapInitialized() {
-            if (leafletMapInstance) return true;
-            if (typeof L === "undefined") return false;
-
-            const lat = Number.parseFloat(GEOFENCE_CONFIG.centerLat) || 45.4642;
-            const lng = Number.parseFloat(GEOFENCE_CONFIG.centerLng) || 9.19;
-            leafletMapInstance = L.map(geoMapPreviewEl).setView([lat, lng], 16);
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                maxZoom: 19,
-                attribution: "&copy; OpenStreetMap contributors"
-            }).addTo(leafletMapInstance);
-
-            leafletMarker = L.marker([lat, lng]).addTo(leafletMapInstance);
-            leafletCircleEntry = L.circle([lat, lng], {
-                radius: GEOFENCE_CONFIG.radiusEntryMeters,
-                color: "#2563eb",
-                fillColor: "#93c5fd",
-                fillOpacity: 0.2
-            }).addTo(leafletMapInstance);
-            leafletCircleExit = L.circle([lat, lng], {
-                radius: GEOFENCE_CONFIG.radiusExitMeters,
-                color: "#f97316",
-                fillColor: "#fdba74",
-                fillOpacity: 0.18
-            }).addTo(leafletMapInstance);
-
-            if (leafletMapClickHandler) {
-                leafletMapInstance.off("click", leafletMapClickHandler);
-            }
-            leafletMapClickHandler = (event) => {
-                if (!isPolygonDrawMode) return;
-                GEOFENCE_CONFIG.polygonPath.push({ lat: event.latlng.lat, lng: event.latlng.lng });
-                refreshMapPreview();
-            };
-            leafletMapInstance.on("click", leafletMapClickHandler);
-            return true;
-        }
-
-        async function refreshMapPreview() {
-            const lat = Number.parseFloat(geoLatInput.value || GEOFENCE_CONFIG.centerLat);
-            const lng = Number.parseFloat(geoLngInput.value || GEOFENCE_CONFIG.centerLng);
-            const radiusEntry = Number.parseFloat(geoRadiusEntryInput.value || GEOFENCE_CONFIG.radiusEntryMeters || 120);
-            const radiusExit = Number.parseFloat(geoRadiusExitInput.value || GEOFENCE_CONFIG.radiusExitMeters || 120);
-            const loaded = await ensureGoogleMapInitialized();
-            if (!loaded || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-            leafletMapInstance.setView([lat, lng], leafletMapInstance.getZoom());
-            leafletMarker.setLatLng([lat, lng]);
-            leafletCircleEntry.setLatLng([lat, lng]).setRadius(radiusEntry);
-            leafletCircleExit.setLatLng([lat, lng]).setRadius(radiusExit);
-
-            if (leafletPolygon) {
-                leafletMapInstance.removeLayer(leafletPolygon);
-                leafletPolygon = null;
-            }
-            if (Array.isArray(GEOFENCE_CONFIG.polygonPath) && GEOFENCE_CONFIG.polygonPath.length >= 3) {
-                leafletPolygon = L.polygon(GEOFENCE_CONFIG.polygonPath, {
-                    color: "#0ea5e9",
-                    fillColor: "#67e8f9",
-                    fillOpacity: 0.2
-                }).addTo(leafletMapInstance);
-            }
-
-            if (leafletMapInstance) {
-                leafletMapInstance.invalidateSize({ animate: false });
-            }
-        }
-
-        function getRequiredRadiusByStep(index) {
-            return isEntryStep(index)
-                ? GEOFENCE_CONFIG.radiusEntryMeters
-                : GEOFENCE_CONFIG.radiusExitMeters;
-        }
-
-        function updateGeoAdminStatus(message, isError = false) {
-            if (!geoAdminStatusEl) return;
-            geoAdminStatusEl.textContent = message;
-            geoAdminStatusEl.style.color = isError ? "#dc2626" : "#4b5563";
-        }
-
-        function fillGeoAdminFormFromConfig(skipMapRefresh) {
-            geoAddressInput.value = GEOFENCE_CONFIG.address || "";
-            geoLatInput.value = GEOFENCE_CONFIG.centerLat || "";
-            geoLngInput.value = GEOFENCE_CONFIG.centerLng || "";
-            geoRadiusEntryInput.value = GEOFENCE_CONFIG.radiusEntryMeters || 120;
-            geoRadiusExitInput.value = GEOFENCE_CONFIG.radiusExitMeters || 120;
-            geoMaxAccuracyInput.value = GEOFENCE_CONFIG.maxAccuracyMeters || 60;
-            if (!skipMapRefresh) {
-                refreshMapPreview();
-            }
-        }
-
-        /** Dopo showView(admin): il DOM è visibile; doppio rAF così Leaflet legge larghezza/altezza corrette */
-        function refreshMapWhenAdminPanelVisible() {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    refreshMapPreview();
-                });
-            });
-        }
-
-        function persistGeofenceConfigLocal() {
-            localStorage.setItem(GEOFENCE_STORAGE_KEY, JSON.stringify(GEOFENCE_CONFIG));
-        }
-
-        function loadGeofenceConfigLocal() {
-            const raw = localStorage.getItem(GEOFENCE_STORAGE_KEY);
-            if (!raw) return;
-            try {
-                const parsed = JSON.parse(raw);
-                if (typeof parsed.address === "string") GEOFENCE_CONFIG.address = parsed.address;
-                if (Number.isFinite(parsed.centerLat)) GEOFENCE_CONFIG.centerLat = parsed.centerLat;
-                if (Number.isFinite(parsed.centerLng)) GEOFENCE_CONFIG.centerLng = parsed.centerLng;
-                if (Number.isFinite(parsed.radiusEntryMeters) && parsed.radiusEntryMeters > 0) {
-                    GEOFENCE_CONFIG.radiusEntryMeters = parsed.radiusEntryMeters;
-                }
-                if (Number.isFinite(parsed.radiusExitMeters) && parsed.radiusExitMeters > 0) {
-                    GEOFENCE_CONFIG.radiusExitMeters = parsed.radiusExitMeters;
-                }
-                if (Number.isFinite(parsed.maxAccuracyMeters) && parsed.maxAccuracyMeters > 0) {
-                    GEOFENCE_CONFIG.maxAccuracyMeters = parsed.maxAccuracyMeters;
-                }
-                if (Array.isArray(parsed.polygonPath)) {
-                    GEOFENCE_CONFIG.polygonPath = parsed.polygonPath
-                        .filter(p => Number.isFinite(p?.lat) && Number.isFinite(p?.lng))
-                        .map(p => ({ lat: p.lat, lng: p.lng }));
-                }
-            } catch (error) {
-                console.warn("Config geofence non valida in localStorage:", error);
-            }
-        }
-
-        async function loadGeofenceConfig() {
-            const { data, error } = await supabase
-                .from("geofence_settings")
-                .select("id, address, center_lat, center_lng, radius_entry_meters, radius_exit_meters, max_accuracy_meters, polygon_path")
-                .eq("id", GEOFENCE_DB_ID)
-                .maybeSingle();
-
-            if (error) {
-                if (isLikelyNetworkError(error)) {
-                    console.warn(
-                        "Geofence: Supabase non raggiungibile (rete o progetto in pausa). Uso cache browser."
-                    );
-                } else {
-                    console.warn("Errore lettura geofence da Supabase, uso fallback locale:", error.message);
-                }
-                loadGeofenceConfigLocal();
-                return false;
-            }
-            if (!data) {
-                loadGeofenceConfigLocal();
-                return false;
-            }
-
-            if (typeof data.address === "string") GEOFENCE_CONFIG.address = data.address;
-            if (Number.isFinite(data.center_lat)) GEOFENCE_CONFIG.centerLat = data.center_lat;
-            if (Number.isFinite(data.center_lng)) GEOFENCE_CONFIG.centerLng = data.center_lng;
-            if (Number.isFinite(data.radius_entry_meters) && data.radius_entry_meters > 0) {
-                GEOFENCE_CONFIG.radiusEntryMeters = data.radius_entry_meters;
-            }
-            if (Number.isFinite(data.radius_exit_meters) && data.radius_exit_meters > 0) {
-                GEOFENCE_CONFIG.radiusExitMeters = data.radius_exit_meters;
-            }
-            if (Number.isFinite(data.max_accuracy_meters) && data.max_accuracy_meters > 0) {
-                GEOFENCE_CONFIG.maxAccuracyMeters = data.max_accuracy_meters;
-            }
-            if (Array.isArray(data.polygon_path)) {
-                GEOFENCE_CONFIG.polygonPath = data.polygon_path
-                    .filter(p => Number.isFinite(p?.lat) && Number.isFinite(p?.lng))
-                    .map(p => ({ lat: p.lat, lng: p.lng }));
-            }
-
-            // Cache locale come fallback
-            persistGeofenceConfigLocal();
-            return true;
-        }
-
-        async function persistGeofenceConfig() {
-            persistGeofenceConfigLocal();
-
-            const payload = {
-                id: GEOFENCE_DB_ID,
-                address: GEOFENCE_CONFIG.address || "",
-                center_lat: GEOFENCE_CONFIG.centerLat,
-                center_lng: GEOFENCE_CONFIG.centerLng,
-                radius_entry_meters: GEOFENCE_CONFIG.radiusEntryMeters,
-                radius_exit_meters: GEOFENCE_CONFIG.radiusExitMeters,
-                max_accuracy_meters: GEOFENCE_CONFIG.maxAccuracyMeters,
-                polygon_path: Array.isArray(GEOFENCE_CONFIG.polygonPath) ? GEOFENCE_CONFIG.polygonPath : [],
-                updated_at: new Date().toISOString(),
-                updated_by: currentUser?.id || null,
-            };
-
-            const { error } = await supabase
-                .from("geofence_settings")
-                .upsert(payload, { onConflict: "id", ignoreDuplicates: false });
-            return { error };
-        }
-
-        async function applyGeofenceConfigFromAdminForm() {
-            const lat = Number.parseFloat(geoLatInput.value.trim());
-            const lng = Number.parseFloat(geoLngInput.value.trim());
-            const radiusEntry = Number.parseFloat(geoRadiusEntryInput.value);
-            const radiusExit = Number.parseFloat(geoRadiusExitInput.value);
-            const maxAccuracy = Number.parseFloat(geoMaxAccuracyInput.value);
-
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-                showMessage("Latitudine/Longitudine non valide.", true);
-                updateGeoAdminStatus("Coordinate non valide.", true);
-                return false;
-            }
-            if (!Number.isFinite(radiusEntry) || radiusEntry < 10) {
-                showMessage("Raggio ingresso non valido (minimo 10m).", true);
-                updateGeoAdminStatus("Raggio ingresso non valido.", true);
-                return false;
-            }
-            if (!Number.isFinite(radiusExit) || radiusExit < 10) {
-                showMessage("Raggio uscita non valido (minimo 10m).", true);
-                updateGeoAdminStatus("Raggio uscita non valido.", true);
-                return false;
-            }
-            if (!Number.isFinite(maxAccuracy) || maxAccuracy < 5) {
-                showMessage("Precisione GPS massima non valida (minimo 5m).", true);
-                updateGeoAdminStatus("Precisione GPS non valida.", true);
-                return false;
-            }
-
-            GEOFENCE_CONFIG.address = geoAddressInput.value.trim();
-            GEOFENCE_CONFIG.centerLat = lat;
-            GEOFENCE_CONFIG.centerLng = lng;
-            GEOFENCE_CONFIG.radiusEntryMeters = radiusEntry;
-            GEOFENCE_CONFIG.radiusExitMeters = radiusExit;
-            GEOFENCE_CONFIG.maxAccuracyMeters = maxAccuracy;
-
-            const { error } = await persistGeofenceConfig();
-            if (error) {
-                showMessage(`Errore salvataggio geofence su server: ${error.message}`, true);
-                updateGeoAdminStatus("Errore salvataggio geofence su server.", true);
-                return false;
-            }
-            fillGeoAdminFormFromConfig();
-            updateGeoAdminStatus("Impostazioni geofence salvate con successo (web + app).");
-            return true;
-        }
-
-        function stopGeoTracking() {
-            if (geoWatchId !== null) {
-                navigator.geolocation.clearWatch(geoWatchId);
-                geoWatchId = null;
-            }
-            geoToggleBtn.textContent = "Attiva Timbratura Automatica da Posizione";
-            geoStatusEl.textContent = "Geolocalizzazione non attiva.";
-        }
-
         async function runSinglePunch() {
             if (!currentUser || nextPunchIndex >= punchSteps.length || autoPunchInProgress) return;
 
@@ -1389,42 +1094,6 @@
             await loadPunches();
         }
 
-        async function maybeAutoPunchFromPosition(position) {
-            if (!currentUser || nextPunchIndex >= punchSteps.length) return;
-            const nowMs = Date.now();
-            if (nowMs - lastAutoPunchAt < 90000) return;
-
-            const { latitude, longitude, accuracy } = position.coords;
-            const distance = getDistanceMeters(
-                latitude,
-                longitude,
-                GEOFENCE_CONFIG.centerLat,
-                GEOFENCE_CONFIG.centerLng
-            );
-            const requiredRadius = getRequiredRadiusByStep(nextPunchIndex);
-            const insideByRadius = distance <= requiredRadius;
-            const hasPolygon = Array.isArray(GEOFENCE_CONFIG.polygonPath) && GEOFENCE_CONFIG.polygonPath.length >= 3;
-            const insideByPolygon = hasPolygon ? isPointInsidePolygon(latitude, longitude, GEOFENCE_CONFIG.polygonPath) : false;
-            const inside = hasPolygon ? insideByPolygon : insideByRadius;
-            const roundedDistance = Math.round(distance);
-
-            if (accuracy > GEOFENCE_CONFIG.maxAccuracyMeters) {
-                geoStatusEl.textContent = `Precisione GPS insufficiente (${Math.round(accuracy)} m > ${Math.round(GEOFENCE_CONFIG.maxAccuracyMeters)} m).`;
-                return;
-            }
-
-            if (!inside) {
-                const modeText = hasPolygon ? "area poligonale" : `raggio richiesto ${Math.round(requiredRadius)} m`;
-                geoStatusEl.textContent = `Fuori area: ${roundedDistance} m (${modeText}, precisione ~${Math.round(accuracy)} m).`;
-                return;
-            }
-
-            geoStatusEl.textContent = `Dentro area: ${roundedDistance} m. Controllo timbratura...`;
-            await runSinglePunch();
-            lastAutoPunchAt = Date.now();
-            geoStatusEl.textContent = `Dentro area: ${roundedDistance} m. Timbratura automatica attiva.`;
-        }
-        
         const VIEW_STORAGE_KEY = "badgeapp-active-view-v1";
 
         /** Normalizza orario DB (HH:MM o HH:MM:SS) per input type=time con step=1 */
@@ -2405,10 +2074,7 @@
         // 🔹 Gestione del click sul tasto Admin fisso
         fixedAdminBtn.addEventListener("click", async () => {
             if (isAdmin) {
-                await loadGeofenceConfig();
                 showView(adminView);
-                fillGeoAdminFormFromConfig(true);
-                refreshMapWhenAdminPanelVisible();
                 await loadAllProfiles();
             } else {
                 currentHistoryUserId = null;
@@ -2428,190 +2094,6 @@
         if (backFromAdminFooterBtn) {
             backFromAdminFooterBtn.addEventListener("click", goBackFromAdminToPunch);
         }
-
-        geoToggleBtn.addEventListener("click", () => {
-            if (!currentUser) {
-                showMessage("Devi essere loggato per attivare la geolocalizzazione.", true);
-                return;
-            }
-            if (!isGeofenceConfigured()) {
-                showMessage("Configura centerLat/centerLng in GEOFENCE_CONFIG prima di attivare.", true);
-                return;
-            }
-            if (!navigator.geolocation) {
-                showMessage("Geolocalizzazione non supportata su questo dispositivo/browser.", true);
-                return;
-            }
-
-            if (geoWatchId !== null) {
-                stopGeoTracking();
-                return;
-            }
-
-            geoToggleBtn.textContent = "Disattiva Timbratura Automatica da Posizione";
-            geoStatusEl.textContent = "Ricerca posizione in corso...";
-
-            geoWatchId = navigator.geolocation.watchPosition(
-                (position) => {
-                    maybeAutoPunchFromPosition(position);
-                },
-                (error) => {
-                    console.error("ERRORE GEOFENCE:", error);
-                    stopGeoTracking();
-                    showMessage(`Errore geolocalizzazione: ${error.message}`, true);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 5000,
-                }
-            );
-        });
-
-        geoSaveSettingsBtn.addEventListener("click", async () => {
-            if (!isAdmin) {
-                showMessage("Solo admin possono cambiare la geofence.", true);
-                return;
-            }
-            await applyGeofenceConfigFromAdminForm();
-        });
-
-        geoUseCurrentPositionBtn.addEventListener("click", () => {
-            if (!isAdmin) {
-                showMessage("Solo admin possono cambiare la geofence.", true);
-                return;
-            }
-            if (!navigator.geolocation) {
-                showMessage("Geolocalizzazione non supportata su questo dispositivo/browser.", true);
-                return;
-            }
-
-            updateGeoAdminStatus("Lettura posizione corrente...");
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    geoLatInput.value = position.coords.latitude.toFixed(6);
-                    geoLngInput.value = position.coords.longitude.toFixed(6);
-                    refreshMapPreview();
-                    updateGeoAdminStatus("Posizione corrente acquisita. Salva le impostazioni.");
-                },
-                (error) => {
-                    updateGeoAdminStatus(`Errore posizione: ${error.message}`, true);
-                    showMessage(`Errore geolocalizzazione: ${error.message}`, true);
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        });
-
-        geoGeocodeBtn.addEventListener("click", async () => {
-            if (!isAdmin) {
-                showMessage("Solo admin possono cambiare la geofence.", true);
-                return;
-            }
-            const address = geoAddressInput.value.trim();
-            if (!address) {
-                showMessage("Inserisci un indirizzo da cercare.", true);
-                return;
-            }
-            updateGeoAdminStatus("Ricerca coordinate da indirizzo in corso...");
-            try {
-                const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const results = await response.json();
-                if (!Array.isArray(results) || results.length === 0) {
-                    updateGeoAdminStatus("Nessun risultato trovato per l'indirizzo.", true);
-                    showMessage("Nessuna coordinata trovata per questo indirizzo.", true);
-                    return;
-                }
-                const first = results[0];
-                geoAddressInput.value = first.display_name || geoAddressInput.value;
-                geoLatInput.value = Number.parseFloat(first.lat).toFixed(6);
-                geoLngInput.value = Number.parseFloat(first.lon).toFixed(6);
-                hideAddressSuggestions();
-                refreshMapPreview();
-
-                updateGeoAdminStatus("Coordinate trovate. Verifica e salva le impostazioni.");
-            } catch (error) {
-                console.error("ERRORE GEOCODING:", error);
-                updateGeoAdminStatus("Errore durante la ricerca coordinate.", true);
-                showMessage("Impossibile risolvere l'indirizzo ora. Inserisci lat/lng manualmente.", true);
-            }
-        });
-
-        geoAddressInput.addEventListener("input", async () => {
-            const query = geoAddressInput.value.trim();
-            if (addressTypingDebounce) clearTimeout(addressTypingDebounce);
-            if (query.length < 3) {
-                hideAddressSuggestions();
-                return;
-            }
-
-            addressTypingDebounce = setTimeout(async () => {
-                try {
-                    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(query)}`;
-                    const response = await fetch(url);
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    const suggestions = await response.json();
-                    renderAddressSuggestions(Array.isArray(suggestions) ? suggestions : []);
-                } catch (error) {
-                    console.error("ERRORE AUTOCOMPLETE OSM:", error);
-                    hideAddressSuggestions();
-                }
-            }, 250);
-        });
-
-        geoAddressSuggestionsEl.addEventListener("click", async (event) => {
-            const button = event.target.closest("button[data-lat][data-lng]");
-            if (!button) return;
-            const lat = Number.parseFloat(button.getAttribute("data-lat"));
-            const lng = Number.parseFloat(button.getAttribute("data-lng"));
-            const label = button.getAttribute("data-label") || geoAddressInput.value;
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-            geoAddressInput.value = label;
-            geoLatInput.value = lat.toFixed(6);
-            geoLngInput.value = lng.toFixed(6);
-            hideAddressSuggestions();
-            await refreshMapPreview();
-            updateGeoAdminStatus("Indirizzo selezionato. Controlla raggi e salva.");
-        });
-
-        geoDrawPolygonBtn.addEventListener("click", async () => {
-            if (!isAdmin) {
-                showMessage("Solo admin possono disegnare l'area.", true);
-                return;
-            }
-            const ok = await ensureGoogleMapInitialized();
-            if (!ok) {
-                showMessage("Mappa non inizializzata. Riprova tra qualche secondo.", true);
-                return;
-            }
-            isPolygonDrawMode = !isPolygonDrawMode;
-            if (isPolygonDrawMode) {
-                geoDrawPolygonBtn.textContent = "Fine Disegno Area";
-                updateGeoAdminStatus("Modalità disegno attiva: clicca sulla mappa per aggiungere i vertici.");
-            } else {
-                geoDrawPolygonBtn.textContent = "Disegna Area";
-                updateGeoAdminStatus("Disegno area completato. Salva impostazioni.");
-            }
-        });
-
-        geoClearPolygonBtn.addEventListener("click", async () => {
-            if (!isAdmin) {
-                showMessage("Solo admin possono modificare l'area.", true);
-                return;
-            }
-            GEOFENCE_CONFIG.polygonPath = [];
-            isPolygonDrawMode = false;
-            geoDrawPolygonBtn.textContent = "Disegna Area";
-            await refreshMapPreview();
-            updateGeoAdminStatus("Area poligonale rimossa. Salva impostazioni.");
-        });
-
-        [geoLatInput, geoLngInput, geoRadiusEntryInput, geoRadiusExitInput, geoMaxAccuracyInput].forEach((input) => {
-            input.addEventListener("input", () => {
-                refreshMapPreview();
-            });
-        });
 
         // 🔹 Gestione Timbro Singolo (UI odierna)
         timbraBtn.addEventListener("click", async () => {
@@ -2688,7 +2170,6 @@
         });
         
         document.getElementById("logout-btn").addEventListener("click", async () => {
-            stopGeoTracking();
             const { error } = await supabase.auth.signOut();
              if (error) {
                  console.error("ERRORE LOGOUT:", error);
@@ -2814,15 +2295,6 @@
 
             showMessage(`Email di reset inviata a ${targetEmail}. La nuova password verrà impostata dal dipendente dal link ricevuto.`);
         });
-
-
-        // 🔹 Stato autenticazione (entry point principale)
-        async function initGeofenceConfig() {
-            await loadGeofenceConfig();
-            /* Non inizializzare Leaflet qui: #admin-view è nascosto e la mappa avrebbe size 0 (una sola tile grigia). */
-            fillGeoAdminFormFromConfig(true);
-        }
-        initGeofenceConfig();
 
         recoveryPasswordForm.addEventListener("submit", async (e) => {
             e.preventDefault();
