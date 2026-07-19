@@ -1,15 +1,26 @@
 # Secret GitHub Actions (badgeapp-stabile)
 
-Configura in **Settings → Secrets and variables → Actions → Repository secrets**:
+## Supabase Keepalive
+
+Il workflow **Supabase Keepalive** funziona anche **senza secret**: usa i default pubblici del progetto Timbrature Online già presenti in `index.html`.
+
+Secret **opzionali** (Settings → Secrets and variables → Actions → Repository secrets), solo se vuoi override:
 
 | Nome | Valore |
 |------|--------|
 | `SUPABASE_URL` | `https://pobrjdrqpzerjlcqnpra.supabase.co` |
 | `SUPABASE_ANON_KEY` | Chiave **anon public** da [Supabase](https://supabase.com/dashboard/project/pobrjdrqpzerjlcqnpra/settings/api) |
 
-Workflow che li usano:
+Dopo un push, verifica con **Actions → Supabase Keepalive → Run workflow**.
 
-- **Supabase Keepalive** — ping ogni 6 giorni (evita pausa progetto free)
-- **Publish web + mobile OTA** (opzionale): `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID`, `EXPO_TOKEN`
+## Publish web + mobile OTA (opzionale)
 
-Dopo aver aggiunto i secret, vai su **Actions → Supabase Keepalive → Run workflow** per verificare che il job `ping` sia verde.
+| Nome | Uso |
+|------|-----|
+| `NETLIFY_AUTH_TOKEN` | Deploy Netlify da CI |
+| `NETLIFY_SITE_ID` | Site ID Netlify |
+| `EXPO_TOKEN` | Publish OTA Expo |
+
+## Se il ping fallisce con 502/503/504
+
+Il progetto Supabase free è in pausa: aprilo su [supabase.com/dashboard](https://supabase.com/dashboard/project/pobrjdrqpzerjlcqnpra) e ripristinalo. Il keepalive evita nuove pause, ma non riattiva un progetto già sospeso.

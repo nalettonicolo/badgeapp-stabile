@@ -1,9 +1,10 @@
 name: Supabase Keepalive
 
 # Evita che il progetto Supabase free vada in pausa per inattività.
-# Secret richiesti (Settings → Secrets and variables → Actions → Repository secrets):
-#   SUPABASE_URL       → https://pobrjdrqpzerjlcqnpra.supabase.co
-#   SUPABASE_ANON_KEY  → chiave anon/public da Supabase → Project Settings → API
+# Secret opzionali (Settings → Secrets and variables → Actions):
+#   SUPABASE_URL       → override URL progetto
+#   SUPABASE_ANON_KEY  → override chiave anon/public
+# Se i secret mancano, usa gli stessi default pubblici già presenti in index.html.
 
 on:
   schedule:
@@ -21,31 +22,37 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
-            echo "::error::Secret mancanti. Aggiungi in GitHub:"
-            echo "  Repository → Settings → Secrets and variables → Actions"
-            echo "  • SUPABASE_URL (es. https://pobrjdrqpzerjlcqnpra.supabase.co)"
-            echo "  • SUPABASE_ANON_KEY (anon key da Supabase Dashboard → API)"
-            echo ""
-            echo "Non usare un Environment separato a meno che non ci copi gli stessi secret."
-            exit 1
+          # Default pubblici già nel repo (anon key = client-side, non è un secret critico).
+          DEFAULT_URL="https://pobrjdrqpzerjlcqnpra.supabase.co"
+          DEFAULT_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvYnJqZHJxcHplcmpsY3FucHJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE0ODgyODMsImV4cCI6MjA3NzA2NDI4M30.p2XZ7tA-OPye2T5hGhx89BNF-kyhTcnrnt33ho0jDKU"
+
+          URL="${SUPABASE_URL:-}"
+          KEY="${SUPABASE_ANON_KEY:-}"
+
+          if [ -z "${URL}" ] || [ -z "${KEY}" ]; then
+            echo "::warning::Secret SUPABASE_URL / SUPABASE_ANON_KEY assenti: uso i default del progetto Timbrature Online."
+            URL="${URL:-$DEFAULT_URL}"
+            KEY="${KEY:-$DEFAULT_ANON_KEY}"
           fi
 
-          BASE="${SUPABASE_URL%/}"
+          BASE="${URL%/}"
 
           HTTP_CODE=$(curl -sS -o /tmp/keepalive_response.json -w "%{http_code}" \
             "${BASE}/rest/v1/profiles?select=id&limit=1" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "apikey: ${KEY}" \
+            -H "Authorization: Bearer ${KEY}" \
             --connect-timeout 20 \
-            --max-time 45)
+            --max-time 45) || {
+              echo "::error::curl fallito (rete o DNS). Controlla che il progetto Supabase sia attivo."
+              exit 1
+            }
 
           echo "Supabase keepalive HTTP code: ${HTTP_CODE}"
           head -c 500 /tmp/keepalive_response.json 2>/dev/null || true
           echo ""
 
           case "${HTTP_CODE}" in
-            200|401|403|406)
+            200|201|204|401|403|406)
               echo "OK: API raggiungibile (codice ${HTTP_CODE})."
               ;;
             502|503|504)
