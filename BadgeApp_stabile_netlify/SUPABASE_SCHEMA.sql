@@ -513,6 +513,56 @@ BEGIN
 END
 $$;
 
+-- -----------------------------------------------------------------------------
+-- 8) FIX SICUREZZA CRITICO: escalation di privilegi in fase di signup
+--
+-- Il form admin "Aggiungi dipendente" chiama direttamente l'endpoint pubblico
+-- POST {supabaseUrl}/auth/v1/signup con la anon key (pubblica, presente nel
+-- codice client) passando is_admin_requested nei metadata dell'utente.
+-- La versione precedente di handle_new_auth_user() copiava quel valore in
+-- public.profiles.is_admin SENZA ALCUN CONTROLLO server-side: chiunque avesse
+-- la anon key poteva chiamare l'endpoint direttamente (bypassando del tutto
+-- l'app e il suo controllo isAdmin, che è solo lato client) e ottenere un
+-- profilo con is_admin = true.
+--
+-- Fix: il trigger ora ignora sempre is_admin_requested e crea il profilo con
+-- is_admin = false. Il flusso "admin crea un altro admin" nell'app continua a
+-- funzionare senza modifiche al client: dopo la signup, il form esegue già un
+-- upsert su public.profiles con is_admin = true usando la SESSIONE
+-- DELL'ADMIN — upsert soggetto alla RLS profiles_update_admin_all, che
+-- verifica server-side che il chiamante sia davvero un admin. Solo quel
+-- percorso, verificato, può ora impostare is_admin = true.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, first_name, last_name, is_admin)
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'first_name', ''),
+    COALESCE(new.raw_user_meta_data->>'last_name', ''),
+    false
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = excluded.email,
+    first_name = COALESCE(excluded.first_name, public.profiles.first_name),
+    last_name = COALESCE(excluded.last_name, public.profiles.last_name);
+  RETURN new;
+END;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- 9) Integrità dati: pausa_minuti non può essere negativa
+-- -----------------------------------------------------------------------------
+ALTER TABLE public.daily_punches DROP CONSTRAINT IF EXISTS daily_punches_pausa_minuti_check;
+ALTER TABLE public.daily_punches
+  ADD CONSTRAINT daily_punches_pausa_minuti_check CHECK (pausa_minuti IS NULL OR pausa_minuti >= 0);
+
 -- =============================================================================
 -- Fine
 -- =============================================================================
