@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -68,4 +68,27 @@ test('le funzioni/guardie critiche dell\'app sono ancora presenti', () => {
 test('supabase-config.js espone la configurazione attesa', () => {
   const cfg = readFileSync(join(root, 'supabase-config.js'), 'utf8');
   assert.match(cfg, /__BADGEAPP_SUPABASE__/);
+});
+
+test('index.html collega il manifest PWA e registra il service worker', () => {
+  assert.match(html, /<link\s+rel="manifest"\s+href="manifest\.webmanifest"\s*\/?>/);
+  assert.match(html, /navigator\.serviceWorker\.register\(['"]\/sw\.js['"]\)/);
+});
+
+test('manifest.webmanifest è JSON valido con i campi PWA minimi', () => {
+  const raw = readFileSync(join(root, 'manifest.webmanifest'), 'utf8');
+  const manifest = JSON.parse(raw); // lancia se il JSON è malformato
+  assert.equal(typeof manifest.name, 'string');
+  assert.ok(manifest.name.length > 0);
+  assert.equal(manifest.display, 'standalone');
+  assert.ok(Array.isArray(manifest.icons) && manifest.icons.length > 0);
+  for (const icon of manifest.icons) {
+    const iconPath = join(root, icon.src.replace(/^\//, ''));
+    assert.ok(existsSync(iconPath), `icona mancante su disco: ${icon.src}`);
+  }
+});
+
+test('sw.js non intercetta mai richieste cross-origin (Supabase/CDN)', () => {
+  const sw = readFileSync(join(root, 'sw.js'), 'utf8');
+  assert.match(sw, /url\.origin\s*!==\s*self\.location\.origin/);
 });

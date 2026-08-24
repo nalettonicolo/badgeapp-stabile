@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Timbrature Online</title>
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="description" content="Timbratura, storico ore e richieste (trasferta, malattia, ferie) per i dipendenti." />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -153,7 +158,7 @@
                 <h2 style="color: #1f2937;"><span id="history-title-prefix">Storico Timbrature</span> <span id="history-user-display" style="font-weight: 700;
                     /* Rimosso colore blu */
                     color: inherit;"></span></h2>
-                <button id="add-punch-btn" style="background-color: #2563eb; color: white; padding: 6px 10px; border-radius: 6px; font-weight: 600; font-size: 1.1rem; line-height: 1;">
+                <button id="add-punch-btn" aria-label="Inserisci timbratura mancante" style="background-color: #2563eb; color: white; padding: 6px 10px; border-radius: 6px; font-weight: 600; font-size: 1.1rem; line-height: 1;">
                     +
                 </button>
             </div>
@@ -373,6 +378,26 @@
             overlapDaysInMonthRange,
         } from './js/utils.js';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        // Rete di sicurezza globale: prima di questa modifica un errore non
+        // intercettato da un try/catch spariva nel nulla (solo in console,
+        // se aperta) e l'utente restava davanti a un'app apparentemente
+        // bloccata senza alcun messaggio. showMessage() è definita più
+        // avanti in questo stesso script: le dichiarazioni "function" sono
+        // hoisted, quindi al momento in cui questi listener scattano
+        // (sempre in modo asincrono) è già disponibile.
+        window.addEventListener('error', (event) => {
+            console.error('Errore non gestito:', event.error || event.message);
+            if (typeof showMessage === 'function') {
+                showMessage('Si è verificato un errore imprevisto. Riprova o ricarica la pagina.', true);
+            }
+        });
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Promise non gestita:', event.reason);
+            if (typeof showMessage === 'function') {
+                showMessage('Si è verificato un errore imprevisto. Riprova o ricarica la pagina.', true);
+            }
+        });
 
         const cfg = typeof window !== "undefined" ? window.__BADGEAPP_SUPABASE__ : null;
         const DEFAULT_SUPABASE_URL = "https://pobrjdrqpzerjlcqnpra.supabase.co";
@@ -1856,6 +1881,21 @@
             }
         });
 
+    </script>
+
+    <script>
+        // Registrazione service worker: abilita installabilità (PWA) e app
+        // shell disponibile offline. Non blocca né ritarda in alcun modo il
+        // caricamento della pagina (post-load, fire-and-forget) e non deve
+        // mai impedire l'uso dell'app se fallisce (es. su http:// non
+        // sicuro, o browser senza supporto).
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch((err) => {
+                    console.warn('Registrazione service worker fallita (non bloccante):', err);
+                });
+            });
+        }
     </script>
 </body>
 </html>
