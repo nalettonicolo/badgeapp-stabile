@@ -563,6 +563,151 @@ ALTER TABLE public.daily_punches DROP CONSTRAINT IF EXISTS daily_punches_pausa_m
 ALTER TABLE public.daily_punches
   ADD CONSTRAINT daily_punches_pausa_minuti_check CHECK (pausa_minuti IS NULL OR pausa_minuti >= 0);
 
+-- -----------------------------------------------------------------------------
+-- 10) FASE 2 — Integrità dati: vincoli di plausibilità aggiuntivi
+--
+-- daily_punches: gli orari possono essere parziali ("buchi intermedi" inseriti
+-- dall'admin sono ammessi di proposito), quindi i vincoli confrontano solo le
+-- coppie in cui ENTRAMBI i valori sono presenti — non bloccano mai un inserimento
+-- parziale, ma rifiutano ordini temporalmente impossibili quando i dati ci sono.
+-- -----------------------------------------------------------------------------
+ALTER TABLE public.daily_punches DROP CONSTRAINT IF EXISTS daily_punches_order_mattina_check;
+ALTER TABLE public.daily_punches
+  ADD CONSTRAINT daily_punches_order_mattina_check
+  CHECK (iniziomattina IS NULL OR finemattina IS NULL OR finemattina >= iniziomattina);
+
+ALTER TABLE public.daily_punches DROP CONSTRAINT IF EXISTS daily_punches_order_pausa_check;
+ALTER TABLE public.daily_punches
+  ADD CONSTRAINT daily_punches_order_pausa_check
+  CHECK (finemattina IS NULL OR iniziopomeriggio IS NULL OR iniziopomeriggio >= finemattina);
+
+ALTER TABLE public.daily_punches DROP CONSTRAINT IF EXISTS daily_punches_order_pomeriggio_check;
+ALTER TABLE public.daily_punches
+  ADD CONSTRAINT daily_punches_order_pomeriggio_check
+  CHECK (iniziopomeriggio IS NULL OR finepomeriggio IS NULL OR finepomeriggio >= iniziopomeriggio);
+
+ALTER TABLE public.daily_punches DROP CONSTRAINT IF EXISTS daily_punches_order_giornata_check;
+ALTER TABLE public.daily_punches
+  ADD CONSTRAINT daily_punches_order_giornata_check
+  CHECK (iniziomattina IS NULL OR finepomeriggio IS NULL OR finepomeriggio >= iniziomattina);
+
+-- employee_requests: le ore dichiarate non possono essere negative.
+ALTER TABLE public.employee_requests DROP CONSTRAINT IF EXISTS employee_requests_travel_hours_check;
+ALTER TABLE public.employee_requests
+  ADD CONSTRAINT employee_requests_travel_hours_check CHECK (travel_hours IS NULL OR travel_hours >= 0);
+
+ALTER TABLE public.employee_requests DROP CONSTRAINT IF EXISTS employee_requests_total_hours_check;
+ALTER TABLE public.employee_requests
+  ADD CONSTRAINT employee_requests_total_hours_check CHECK (total_hours_declared IS NULL OR total_hours_declared >= 0);
+
+-- -----------------------------------------------------------------------------
+-- 11) FASE 2 — Audit log delle modifiche "per conto di" (admin su dati altrui)
+--
+-- Oggi nessuna azione admin è tracciata: se un admin corregge le timbrature di
+-- un dipendente, promuove un altro utente ad admin, o modifica lo stato di una
+-- richiesta altrui, non resta traccia di chi/quando/cosa. Questo introduce un
+-- log append-only, popolato solo da trigger SECURITY DEFINER (il client non ha
+-- alcuna policy di scrittura diretta: non può né falsificare né cancellare voci).
+--
+-- Si registra una riga SOLO quando chi esegue l'operazione (auth.uid()) non
+-- coincide con il proprietario della riga toccata (user_id, o id per profiles) —
+-- cioè esattamente i casi "qualcuno sta agendo per conto di qualcun altro" che
+-- oggi sfuggono a qualunque controllo.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.audit_log (
+  id bigserial PRIMARY KEY,
+  actor_id uuid REFERENCES auth.users (id) ON DELETE SET NULL,
+  action text NOT NULL,
+  table_name text NOT NULL,
+  row_id text NOT NULL,
+  target_user_id uuid,
+  old_data jsonb,
+  new_data jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON public.audit_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS audit_log_target_user_idx ON public.audit_log (target_user_id, created_at DESC);
+
+ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.audit_log IS 'Log append-only (scritto solo da trigger SECURITY DEFINER) delle modifiche fatte da un utente su dati di un altro utente.';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'audit_log' AND policyname = 'audit_log_select_admin_only'
+  ) THEN
+    CREATE POLICY audit_log_select_admin_only
+      ON public.audit_log FOR SELECT TO authenticated
+      USING (
+        EXISTS (
+          SELECT 1 FROM public.profiles p
+          WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
+        )
+      );
+  END IF;
+END
+$$;
+-- Nessuna policy INSERT/UPDATE/DELETE per "authenticated": solo il trigger
+-- (SECURITY DEFINER, gira come proprietario della funzione) può scrivere qui.
+
+CREATE OR REPLACE FUNCTION public.log_on_behalf_of_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_row_id text;
+  v_target_user uuid;
+  v_actor uuid := auth.uid();
+BEGIN
+  IF TG_TABLE_NAME = 'profiles' THEN
+    v_target_user := COALESCE(NEW.id, OLD.id);
+  ELSE
+    v_target_user := COALESCE(NEW.user_id, OLD.user_id);
+  END IF;
+
+  -- Logga solo se qualcuno sta agendo su dati non propri (o se non c'è sessione,
+  -- es. operazioni interne): un utente che tocca solo i propri dati non genera log.
+  IF v_actor IS NOT NULL AND v_actor = v_target_user THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  v_row_id := COALESCE(NEW.id, OLD.id)::text;
+
+  INSERT INTO public.audit_log (actor_id, action, table_name, row_id, target_user_id, old_data, new_data)
+  VALUES (
+    v_actor,
+    TG_OP,
+    TG_TABLE_NAME,
+    v_row_id,
+    v_target_user,
+    CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN to_jsonb(OLD) ELSE NULL END,
+    CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN to_jsonb(NEW) ELSE NULL END
+  );
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS audit_daily_punches ON public.daily_punches;
+CREATE TRIGGER audit_daily_punches
+  AFTER INSERT OR UPDATE OR DELETE ON public.daily_punches
+  FOR EACH ROW EXECUTE FUNCTION public.log_on_behalf_of_change();
+
+DROP TRIGGER IF EXISTS audit_employee_requests ON public.employee_requests;
+CREATE TRIGGER audit_employee_requests
+  AFTER INSERT OR UPDATE OR DELETE ON public.employee_requests
+  FOR EACH ROW EXECUTE FUNCTION public.log_on_behalf_of_change();
+
+DROP TRIGGER IF EXISTS audit_profiles ON public.profiles;
+CREATE TRIGGER audit_profiles
+  AFTER UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.log_on_behalf_of_change();
+
 -- =============================================================================
 -- Fine
 -- =============================================================================
