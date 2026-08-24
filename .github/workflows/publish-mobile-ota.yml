@@ -1,52 +1,29 @@
-# Pubblica il sito Netlify e pubblica un aggiornamento OTA (EAS Update) per l'app mobile
-# su ogni push su main/master che tocca web o mobile.
+# Pubblica un aggiornamento OTA (EAS Update) per l'app mobile su ogni push
+# su main/master che tocca la cartella mobile.
+#
+# Il sito web NON viene pubblicato da questo workflow: Netlify è collegato al
+# repo via integrazione Git nativa (legge netlify.toml dalla root, publish
+# "."), quindi fa deploy in produzione da solo a ogni push su main e genera
+# preview automatiche sulle Pull Request. Un secondo deploy via Netlify CLI
+# qui sarebbe ridondante e rischierebbe di divergere da quello nativo.
 #
 # Segreti GitHub da configurare (Settings → Secrets → Actions):
-#   NETLIFY_AUTH_TOKEN   — token personale Netlify
-#   NETLIFY_SITE_ID      — ID sito (Site settings → Site details)
 #   EXPO_TOKEN           — token Expo (expo.dev → Access Tokens); per EAS Update
 # Opzionale in CI per project EAS:
 #   EAS_PROJECT_ID       — UUID progetto Expo (stesso di extra.eas.projectId dopo eas init)
 
-name: Publish web + mobile OTA
+name: Publish mobile OTA
 
 on:
   push:
     branches: [main, master]
     paths:
-      - 'BadgeApp_stabile_netlify/**'
       - 'badgeapp-mobile/**'
-      - '.github/workflows/publish-web-and-mobile.yml'
+      - '.github/workflows/publish-mobile-ota.yml'
   workflow_dispatch:
 
 jobs:
-  netlify:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Netlify CLI
-        run: npm install -g netlify-cli
-
-      - name: Deploy to Netlify (production)
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        run: |
-          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
-            echo "::warning::NETLIFY_AUTH_TOKEN o NETLIFY_SITE_ID mancanti: salto deploy Netlify."
-            exit 0
-          fi
-          netlify deploy --prod --dir=BadgeApp_stabile_netlify --site="$NETLIFY_SITE_ID"
-
   eas-update:
-    needs: netlify
     runs-on: ubuntu-latest
     defaults:
       run:

@@ -1,65 +1,42 @@
-BadgeApp stabile - guida deploy GitHub + Netlify
-
-Contenuto della cartella:
-- index.html
+BadgeApp / Timbrature Online — guida deploy
 
 --------------------------------------------------
-STEP 1 - Crea repository GitHub
+Struttura del repository
 --------------------------------------------------
-1) Vai su GitHub e crea un nuovo repo, ad esempio: badgeapp-stabile
-2) Non aggiungere README/.gitignore dal sito (repo vuoto)
+- index.html, styles.css, js/, supabase-config.js  → sito web (statico, nessuna build)
+- SUPABASE_SCHEMA.sql                                → schema/migrazioni DB (Supabase → SQL Editor → Run)
+- badgeapp-mobile/                                   → app mobile (Expo / React Native)
+- netlify.toml                                       → publish "." (root), nessun build command
 
 --------------------------------------------------
-STEP 2 - Inizializza repo locale in questa cartella
+Deploy del sito web
 --------------------------------------------------
-Apri terminale dentro BadgeApp_stabile_netlify e lancia:
+Il sito è collegato a Netlify via integrazione Git nativa (Netlify → Site
+settings → Build & deploy), che legge netlify.toml dalla root del repo:
+- ogni push su main → deploy in produzione
+- ogni Pull Request → deploy preview automatico con URL dedicato
 
-git init
+Non serve alcun comando manuale: build command è vuoto ("nessuna build
+richiesta"), publish directory è la root del repo.
+
+Flusso consigliato per non toccare subito la produzione:
+
+git checkout -b feature/nome-modifica
+# modifiche...
 git add .
-git commit -m "Initial stable release"
-git branch -M main
-git remote add origin https://github.com/nalettonicolo/badgeapp-stabile
-git push -u origin main
+git commit -m "feat: ..."
+git push -u origin feature/nome-modifica
+# apri una Pull Request verso main: Netlify genera un URL di anteprima
+
+Quando pronto, fai merge della PR su main: Netlify fa il deploy in produzione.
 
 --------------------------------------------------
-STEP 3 - Collega Netlify a GitHub
+Database Supabase (obbligatorio per app web + mobile)
 --------------------------------------------------
-1) Netlify > Add new site > Import an existing project
-2) Scegli GitHub e autorizza
-3) Seleziona il repo badgeapp-stabile
-4) Build settings:
-   - Build command: (vuoto)
-   - Publish directory: .
-5) Deploy site
-
---------------------------------------------------
-STEP 4 - Flusso consigliato (meno deploy inutili)
---------------------------------------------------
-Per lavorare senza toccare subito la produzione:
-
-git checkout -b develop
-
-Fai modifiche, poi:
-
-git add .
-git commit -m "feat: ... "
-git push -u origin develop
-
-Quando pronto per produzione:
-
-git checkout main
-git merge develop
-git push origin main
-
-Netlify farà deploy produzione solo quando aggiorni main.
-
---------------------------------------------------
-STEP 5 - Deploy preview opzionale
---------------------------------------------------
-Se vuoi preview automatiche:
-- Apri Pull Request da develop -> main su GitHub
-- Netlify genera Preview URL
-- Dopo test, fai merge
+1) Apri il progetto su [Supabase](https://supabase.com) → **SQL Editor**.
+2) Incolla tutto il file **`SUPABASE_SCHEMA.sql`** (nella root del repo) ed esegui **Run** una volta.
+   - È idempotente: applicabile più volte senza cancellare dati, aggiunge solo
+     tabelle/colonne/policy/vincoli mancanti.
 
 --------------------------------------------------
 Nota privacy posizione

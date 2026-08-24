@@ -40,11 +40,14 @@ Nessun servizio terzo a pagamento e richiesto per l'app in se.
 I costi obbligatori arrivano solo al momento della pubblicazione sugli store ufficiali.
 
 ## Pubblicazione automatica (consigliato)
-Con il repository su GitHub, il workflow `.github/workflows/publish-web-and-mobile.yml` a ogni push su `main`/`master` (cartelle web o mobile):
+- **Sito web**: Netlify è collegato al repo via integrazione Git nativa (non serve
+  alcun workflow GitHub Actions) — deploy in produzione a ogni push su `main`,
+  preview automatiche sulle Pull Request.
+- **App mobile**: il workflow `.github/workflows/publish-mobile-ota.yml` a ogni
+  push su `main`/`master` che tocca `badgeapp-mobile/` pubblica un aggiornamento
+  OTA del JavaScript su Expo (richiede il secret `EXPO_TOKEN`; opzionale
+  `EAS_PROJECT_ID` se usi la stessa variabile in `app.config.js`).
 
-1. **Netlify** — deploy in produzione della cartella `BadgeApp_stabile_netlify` (richiede i secret `NETLIFY_AUTH_TOKEN` e `NETLIFY_SITE_ID`).
-2. **EAS Update** — pubblica un aggiornamento OTA del JavaScript su Expo (richiede `EXPO_TOKEN`; opzionale `EAS_PROJECT_ID` se usi la stessa variabile in `app.config.js`).
-
-Configura Netlify collegando il repo oppure solo i secret sopra. Per la prima volta sull’app mobile: `cd badgeapp-mobile && npx eas init`, poi un build store (`eas build`) con canale `production`; gli OTA successivi arrivano con `npm run publish:ota` o con il workflow CI.
+Per la prima volta sull’app mobile: `cd badgeapp-mobile && npx eas init`, poi un build store (`eas build`) con canale `production`; gli OTA successivi arrivano con `npm run publish:ota` o con il workflow CI.
 
 Variabili EAS per le build cloud restano quelle già indicate (`EXPO_PUBLIC_SUPABASE_*`).

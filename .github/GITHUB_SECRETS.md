@@ -13,13 +13,16 @@ Secret **opzionali** (Settings → Secrets and variables → Actions → Reposit
 
 Dopo un push, verifica con **Actions → Supabase Keepalive → Run workflow**.
 
-## Publish web + mobile OTA (opzionale)
+## Publish mobile OTA (opzionale)
+
+Il sito web NON usa secret GitHub: Netlify è collegato al repo via integrazione
+Git nativa e fa deploy da solo (nessun `NETLIFY_AUTH_TOKEN`/`NETLIFY_SITE_ID`
+necessario in CI).
 
 | Nome | Uso |
 |------|-----|
-| `NETLIFY_AUTH_TOKEN` | Deploy Netlify da CI |
-| `NETLIFY_SITE_ID` | Site ID Netlify |
 | `EXPO_TOKEN` | Publish OTA Expo |
+| `EAS_PROJECT_ID` | Opzionale, UUID progetto Expo |
 
 ## Se il ping fallisce con 502/503/504
 

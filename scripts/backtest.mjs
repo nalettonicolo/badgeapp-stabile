@@ -75,7 +75,6 @@ function checkWebHtml(filePath) {
 }
 
 checkWebHtml(join(root, 'index.html'));
-checkWebHtml(join(root, 'BadgeApp_stabile_netlify', 'index.html'));
 
 const cfgPath = join(root, 'supabase-config.js');
 if (existsSync(cfgPath)) {

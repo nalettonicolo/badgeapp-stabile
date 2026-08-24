@@ -1376,7 +1376,7 @@
             if (error) {
                 console.error("employee_requests:", error);
                 employeeRequestsListEl.innerHTML =
-                    "<span style=\"color:#b91c1c;\">Impossibile caricare l'elenco. In Supabase → SQL Editor esegui <code>SUPABASE_SCHEMA.sql</code> (cartella web).</span>";
+                    "<span style=\"color:#b91c1c;\">Impossibile caricare l'elenco. In Supabase → SQL Editor esegui <code>SUPABASE_SCHEMA.sql</code>.</span>";
                 return;
             }
             if (!data || data.length === 0) {
