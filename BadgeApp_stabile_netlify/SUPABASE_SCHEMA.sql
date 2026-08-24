@@ -250,6 +250,269 @@ BEGIN
 END
 $$;
 
+-- -----------------------------------------------------------------------------
+-- 3) Timbrature giornaliere (daily_punches)
+-- Tabella usata da web (index.html) e app mobile per registrare le 4 timbrature
+-- del giorno (ingresso/uscita mattina, ingresso/uscita pomeriggio) e la pausa.
+-- Mancava in questo file (che pure si dichiara "schema completo"): il file non
+-- bastava a ricreare da zero un progetto Supabase funzionante.
+-- Colonne/tipi allineati allo schema realmente in produzione (id bigint, FK su
+-- profiles) per evitare una migrazione di tipo distruttiva.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.daily_punches (
+  id bigserial PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES public.profiles (id) ON DELETE CASCADE,
+  punch_date date NOT NULL,
+  iniziomattina time,
+  finemattina time,
+  iniziopomeriggio time,
+  finepomeriggio time,
+  pausa_minuti integer,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Migrazione colonne su DB creati senza queste colonne
+ALTER TABLE public.daily_punches ADD COLUMN IF NOT EXISTS iniziomattina time;
+ALTER TABLE public.daily_punches ADD COLUMN IF NOT EXISTS finemattina time;
+ALTER TABLE public.daily_punches ADD COLUMN IF NOT EXISTS iniziopomeriggio time;
+ALTER TABLE public.daily_punches ADD COLUMN IF NOT EXISTS finepomeriggio time;
+ALTER TABLE public.daily_punches ADD COLUMN IF NOT EXISTS pausa_minuti integer;
+ALTER TABLE public.daily_punches ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.daily_punches ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+-- user_id/punch_date sono sempre valorizzati dagli upsert web/mobile: rende la
+-- colonna coerente con il resto dello schema (era rimasta nullable).
+ALTER TABLE public.daily_punches ALTER COLUMN user_id SET NOT NULL;
+ALTER TABLE public.daily_punches ALTER COLUMN punch_date SET NOT NULL;
+
+-- Una sola riga di timbrature per utente/giorno: richiesta dagli upsert web/mobile
+-- con onConflict: "user_id,punch_date".
+ALTER TABLE public.daily_punches DROP CONSTRAINT IF EXISTS daily_punches_user_date_unique;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.daily_punches'::regclass
+      AND conname = 'daily_punches_user_id_punch_date_key'
+  ) THEN
+    ALTER TABLE public.daily_punches
+      ADD CONSTRAINT daily_punches_user_id_punch_date_key UNIQUE (user_id, punch_date);
+  END IF;
+END
+$$;
+
+CREATE INDEX IF NOT EXISTS daily_punches_user_date_idx
+  ON public.daily_punches (user_id, punch_date DESC);
+
+ALTER TABLE public.daily_punches ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.daily_punches IS 'Timbrature giornaliere: 4 orari (mattina/pomeriggio) + pausa pranzo in minuti.';
+COMMENT ON COLUMN public.daily_punches.pausa_minuti IS 'Durata pausa pranzo in minuti, calcolata da finemattina/iniziopomeriggio.';
+
+-- -----------------------------------------------------------------------------
+-- 4) RLS daily_punches (set unico e pulito)
+-- Il dipendente vede/inserisce/aggiorna solo le proprie timbrature; l'admin può
+-- vedere e correggere le timbrature di tutti (usato dallo storico e dall'inserimento
+-- timbrature mancanti in pannello admin).
+--
+-- Sul progetto Supabase in uso si erano accumulate 14 policy duplicate/ridondanti
+-- su questa tabella (create da script diversi in momenti diversi: "Gli admin
+-- vedono tutto", "Punches: Allow authenticated self-insert", "punches_select_own",
+-- ecc. — stessi permessi, nomi diversi). Vengono rimosse per evitare che ogni
+-- query venga valutata contro decine di policy permissive sovrapposte.
+-- -----------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Gli admin vedono tutto" ON public.daily_punches;
+DROP POLICY IF EXISTS "Gli utenti gestiscono i propri dati" ON public.daily_punches;
+DROP POLICY IF EXISTS "Gli utenti vedono solo i propri dati" ON public.daily_punches;
+DROP POLICY IF EXISTS "Punches: Allow authenticated self-insert" ON public.daily_punches;
+DROP POLICY IF EXISTS "Punches: Allow authenticated self-update" ON public.daily_punches;
+DROP POLICY IF EXISTS "Punches: Allow read self and admin read all" ON public.daily_punches;
+DROP POLICY IF EXISTS "Users can insert own punches" ON public.daily_punches;
+DROP POLICY IF EXISTS "Users can update own punches" ON public.daily_punches;
+DROP POLICY IF EXISTS "Users can view own punches" ON public.daily_punches;
+DROP POLICY IF EXISTS punches_insert_admin_all ON public.daily_punches;
+DROP POLICY IF EXISTS punches_insert_own ON public.daily_punches;
+DROP POLICY IF EXISTS punches_select_admin_all ON public.daily_punches;
+DROP POLICY IF EXISTS punches_select_own ON public.daily_punches;
+DROP POLICY IF EXISTS punches_update_admin_all ON public.daily_punches;
+DROP POLICY IF EXISTS punches_update_own ON public.daily_punches;
+DROP POLICY IF EXISTS daily_punches_select_own_or_admin ON public.daily_punches;
+DROP POLICY IF EXISTS daily_punches_insert_own_or_admin ON public.daily_punches;
+DROP POLICY IF EXISTS daily_punches_update_own_or_admin ON public.daily_punches;
+
+CREATE POLICY daily_punches_select_own_or_admin
+  ON public.daily_punches FOR SELECT TO authenticated
+  USING (
+    auth.uid() = user_id
+    OR EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
+    )
+  );
+
+CREATE POLICY daily_punches_insert_own_or_admin
+  ON public.daily_punches FOR INSERT TO authenticated
+  WITH CHECK (
+    auth.uid() = user_id
+    OR EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
+    )
+  );
+
+CREATE POLICY daily_punches_update_own_or_admin
+  ON public.daily_punches FOR UPDATE TO authenticated
+  USING (
+    auth.uid() = user_id
+    OR EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
+    )
+  )
+  WITH CHECK (
+    auth.uid() = user_id
+    OR EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
+    )
+  );
+
+-- -----------------------------------------------------------------------------
+-- 5) Pulizia policy duplicate su profiles + funzioni "is admin" ridondanti
+-- Stesso problema del punto 4 ma su public.profiles: 13 policy accumulate nel
+-- tempo (stesso permesso, nomi/implementazioni diverse: "Users can view own
+-- profile", "Enable read access to own profile", funzioni is_admin()/is_admin(uuid)
+-- /is_admin_check()/is_admin_user(), RPC get_all_profiles() mai usata dal client).
+-- Si riportano a un unico set coerente con il resto del file (già presente sopra
+-- al punto 0: profiles_select_own, profiles_select_admin_all, profiles_update_own,
+-- profiles_update_admin_all, profiles_insert_own).
+-- -----------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Enable read access to own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Profiles: Allow authenticated self-insert or admin-insert" ON public.profiles;
+DROP POLICY IF EXISTS "Profiles: Allow authenticated self-update or admin-update" ON public.profiles;
+DROP POLICY IF EXISTS "Profiles: Allow read self and admin read all" ON public.profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS profiles_insert_admin_all ON public.profiles;
+DROP POLICY IF EXISTS profiles_select_admin_all ON public.profiles;
+DROP POLICY IF EXISTS profiles_update_admin_all ON public.profiles;
+DROP POLICY IF EXISTS profiles_select_own ON public.profiles;
+DROP POLICY IF EXISTS profiles_update_own ON public.profiles;
+DROP POLICY IF EXISTS profiles_insert_own ON public.profiles;
+
+CREATE POLICY profiles_select_own
+  ON public.profiles FOR SELECT TO authenticated
+  USING (auth.uid() = id);
+
+CREATE POLICY profiles_select_admin_all
+  ON public.profiles FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
+    )
+  );
+
+CREATE POLICY profiles_update_own
+  ON public.profiles FOR UPDATE TO authenticated
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY profiles_update_admin_all
+  ON public.profiles FOR UPDATE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
+    )
+  );
+
+CREATE POLICY profiles_insert_own
+  ON public.profiles FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = id);
+
+-- Funzioni helper "is admin" ridondanti: nessuna policy le referenzia più dopo
+-- la pulizia sopra, e nessun'altra tabella/RPC lato client le usa.
+DROP FUNCTION IF EXISTS public.is_admin();
+DROP FUNCTION IF EXISTS public.is_admin(uuid);
+DROP FUNCTION IF EXISTS public.is_admin_check();
+DROP FUNCTION IF EXISTS public.is_admin_user();
+DROP FUNCTION IF EXISTS public.get_all_profiles();
+
+-- -----------------------------------------------------------------------------
+-- 6) employee_requests: tipo "permesso" già in uso in produzione
+-- Non presente nell'UI attuale (solo trasferta/malattia/ferie), ma già ammesso
+-- dal vincolo esistente sul DB: lo si conserva per non rompere righe già salvate.
+-- -----------------------------------------------------------------------------
+ALTER TABLE public.employee_requests DROP CONSTRAINT IF EXISTS employee_requests_request_type_check;
+ALTER TABLE public.employee_requests
+  ADD CONSTRAINT employee_requests_request_type_check
+  CHECK (request_type IN ('trasferta', 'malattia', 'ferie', 'permesso'));
+
+-- -----------------------------------------------------------------------------
+-- 7) Geofence (legacy, tabella non più usata)
+-- La geolocalizzazione/geotimbratura è stata rimossa dall'app (vedi README), ma
+-- la tabella con le impostazioni resta nel DB. Viene solo documentata/resa
+-- idempotente qui: nessuna riga viene toccata.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.geofence_settings (
+  id integer PRIMARY KEY,
+  updated_by uuid REFERENCES auth.users (id) ON DELETE SET NULL,
+  address text DEFAULT '',
+  center_lat double precision NOT NULL DEFAULT 0,
+  center_lng double precision NOT NULL DEFAULT 0,
+  radius_entry_meters double precision NOT NULL DEFAULT 120,
+  radius_exit_meters double precision NOT NULL DEFAULT 120,
+  max_accuracy_meters double precision NOT NULL DEFAULT 60,
+  polygon_path jsonb NOT NULL DEFAULT '[]'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.geofence_settings ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.geofence_settings IS 'Legacy: geolocalizzazione rimossa dall''app, tabella non più letta/scritta dal client.';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'geofence_settings' AND policyname = 'geofence_read_authenticated'
+  ) THEN
+    CREATE POLICY geofence_read_authenticated
+      ON public.geofence_settings FOR SELECT TO authenticated
+      USING (true);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'geofence_settings' AND policyname = 'geofence_update_admin'
+  ) THEN
+    CREATE POLICY geofence_update_admin
+      ON public.geofence_settings FOR UPDATE TO authenticated
+      USING (
+        EXISTS (
+          SELECT 1 FROM public.profiles p
+          WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
+        )
+      )
+      WITH CHECK (
+        EXISTS (
+          SELECT 1 FROM public.profiles p
+          WHERE p.id = auth.uid() AND COALESCE(p.is_admin, false) = true
+        )
+      );
+  END IF;
+END
+$$;
+
 -- =============================================================================
 -- Fine
 -- =============================================================================
