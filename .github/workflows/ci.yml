@@ -1,0 +1,50 @@
+# CI: test automatici su ogni push e Pull Request.
+# Due job indipendenti così un problema mobile non nasconde una rottura sul
+# sito web (o viceversa) nel riepilogo dei check della PR.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-web:
+    name: Test web (unit + struttura)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Esegui test (js/utils.js + struttura index.html)
+        run: node --test tests/utils.test.mjs tests/web-structure.test.mjs
+
+  test-mobile:
+    name: Test mobile (TypeScript)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: badgeapp-mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: badgeapp-mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (tsc --noEmit)
+        run: npx tsc --noEmit

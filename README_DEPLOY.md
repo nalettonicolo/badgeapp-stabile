@@ -31,6 +31,21 @@ git push -u origin feature/nome-modifica
 Quando pronto, fai merge della PR su main: Netlify fa il deploy in produzione.
 
 --------------------------------------------------
+Test automatici
+--------------------------------------------------
+npm test
+
+Esegue (node --test, nessuna dipendenza da installare per la parte web):
+- tests/utils.test.mjs        → unit test delle funzioni pure in js/utils.js
+- tests/web-structure.test.mjs → sanity check strutturale di index.html
+- tests/mobile-types.test.mjs  → type-check TypeScript di badgeapp-mobile
+  (richiede `cd badgeapp-mobile && npm ci` prima; se node_modules manca il
+  test viene saltato invece di fallire)
+
+Girano automaticamente su ogni push/Pull Request via
+.github/workflows/ci.yml (job separati per web e mobile).
+
+--------------------------------------------------
 Database Supabase (obbligatorio per app web + mobile)
 --------------------------------------------------
 1) Apri il progetto su [Supabase](https://supabase.com) → **SQL Editor**.
