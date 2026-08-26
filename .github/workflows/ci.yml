@@ -23,8 +23,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Esegui test (js/utils.js + struttura index.html)
-        run: node --test tests/utils.test.mjs tests/web-structure.test.mjs
+      - name: Esegui test (js/utils.js + struttura index.html + SUPABASE_SCHEMA.sql)
+        run: node --test tests/utils.test.mjs tests/web-structure.test.mjs tests/sql-schema.test.mjs
 
   test-mobile:
     name: Test mobile (TypeScript)

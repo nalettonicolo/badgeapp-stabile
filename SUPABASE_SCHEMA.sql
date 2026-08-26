@@ -441,8 +441,12 @@ CREATE POLICY profiles_insert_own
 
 -- Funzioni helper "is admin" ridondanti: nessuna policy le referenzia più dopo
 -- la pulizia sopra, e nessun'altra tabella/RPC lato client le usa.
+-- NOTA: is_admin(uuid) NON viene droppata qui — il punto 12 più avanti la
+-- ricrea come pezzo di infrastruttura necessario (senza di lei, le policy
+-- "admin" su questa stessa tabella vanno in ricorsione infinita), quindi
+-- droppare qui e ricreare dopo romperebbe un semplice re-run dello script su
+-- un DB dove il punto 12 è già stato applicato in precedenza.
 DROP FUNCTION IF EXISTS public.is_admin();
-DROP FUNCTION IF EXISTS public.is_admin(uuid);
 DROP FUNCTION IF EXISTS public.is_admin_check();
 DROP FUNCTION IF EXISTS public.is_admin_user();
 DROP FUNCTION IF EXISTS public.get_all_profiles();
@@ -707,6 +711,94 @@ DROP TRIGGER IF EXISTS audit_profiles ON public.profiles;
 CREATE TRIGGER audit_profiles
   AFTER UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.log_on_behalf_of_change();
+
+-- -----------------------------------------------------------------------------
+-- 12) FIX CRITICO: ricorsione infinita nelle policy RLS di profiles
+--
+-- Bug introdotto dalla pulizia del punto 5 (e presente, inosservato, fin dalla
+-- primissima versione di questo file al punto 0): le policy
+-- profiles_select_admin_all e profiles_update_admin_all sono definite SULLA
+-- TABELLA profiles con una USING/WITH CHECK che fa
+-- "EXISTS (SELECT 1 FROM public.profiles ...)" — una query su profiles
+-- dentro una policy DI profiles. Postgres deve rivalutare le RLS di profiles
+-- per eseguire quella subquery, il che rivaluta di nuovo la stessa policy,
+-- all'infinito: errore 42P17 "infinite recursion detected in policy for
+-- relation profiles" per QUALSIASI query — anche su altre tabelle — la cui
+-- policy controlli l'admin passando da profiles (employee_requests,
+-- daily_punches, geofence_settings inclusi, perché la loro subquery su
+-- profiles attiva comunque le RLS di profiles).
+--
+-- Prima della pulizia del punto 5 il problema non si manifestava: le policy
+-- realmente attive sul progetto erano quelle col vecchio nome basate sulla
+-- funzione is_admin(uuid) (SECURITY DEFINER, bypassa la RLS al suo interno).
+-- La pulizia le ha sostituite con la definizione di questo file, mai stata
+-- eseguita prima su un progetto reale — da cui il bug rimasto invisibile.
+--
+-- Fix: si ripristina una funzione is_admin(uuid) SECURITY DEFINER (esegue
+-- come proprietario della funzione, i cui privilegi bypassano la RLS nella
+-- query interna) e la si usa ovunque al posto della subquery diretta.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.is_admin(uid uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE((SELECT p.is_admin FROM public.profiles p WHERE p.id = uid), false);
+$$;
+
+REVOKE ALL ON FUNCTION public.is_admin(uuid) FROM public;
+GRANT EXECUTE ON FUNCTION public.is_admin(uuid) TO authenticated;
+
+DROP POLICY IF EXISTS profiles_select_admin_all ON public.profiles;
+CREATE POLICY profiles_select_admin_all
+  ON public.profiles FOR SELECT TO authenticated
+  USING (public.is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS profiles_update_admin_all ON public.profiles;
+CREATE POLICY profiles_update_admin_all
+  ON public.profiles FOR UPDATE TO authenticated
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS daily_punches_select_own_or_admin ON public.daily_punches;
+CREATE POLICY daily_punches_select_own_or_admin
+  ON public.daily_punches FOR SELECT TO authenticated
+  USING (auth.uid() = user_id OR public.is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS daily_punches_insert_own_or_admin ON public.daily_punches;
+CREATE POLICY daily_punches_insert_own_or_admin
+  ON public.daily_punches FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = user_id OR public.is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS daily_punches_update_own_or_admin ON public.daily_punches;
+CREATE POLICY daily_punches_update_own_or_admin
+  ON public.daily_punches FOR UPDATE TO authenticated
+  USING (auth.uid() = user_id OR public.is_admin(auth.uid()))
+  WITH CHECK (auth.uid() = user_id OR public.is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS employee_requests_select_own_or_admin ON public.employee_requests;
+CREATE POLICY employee_requests_select_own_or_admin
+  ON public.employee_requests FOR SELECT TO authenticated
+  USING (auth.uid() = user_id OR public.is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS employee_requests_update_admin ON public.employee_requests;
+CREATE POLICY employee_requests_update_admin
+  ON public.employee_requests FOR UPDATE TO authenticated
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS geofence_update_admin ON public.geofence_settings;
+CREATE POLICY geofence_update_admin
+  ON public.geofence_settings FOR UPDATE TO authenticated
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
+
+DROP POLICY IF EXISTS audit_log_select_admin_only ON public.audit_log;
+CREATE POLICY audit_log_select_admin_only
+  ON public.audit_log FOR SELECT TO authenticated
+  USING (public.is_admin(auth.uid()));
 
 -- =============================================================================
 -- Fine
