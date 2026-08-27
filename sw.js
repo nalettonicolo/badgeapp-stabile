@@ -6,10 +6,18 @@
  * timbrature che mostrasse dati "vecchi" dalla cache al posto di quelli
  * reali sarebbe peggio che non avere offline support.
  *
+ * Strategia: NETWORK-FIRST (non stale-while-revalidate). Questa app non ha
+ * build/versioning con nomi di file con hash: senza network-first, chi apre
+ * l'app da online continua a vedere la versione salvata in cache al primo
+ * caricamento anche quando è uscito un deploy più recente (bug reale,
+ * osservato durante lo sviluppo: una nuova sezione del pannello admin
+ * risultava invisibile su un URL di anteprima già visitato in precedenza).
+ * La cache resta solo un fallback per quando la rete non risponde (offline).
+ *
  * Bump di CACHE_VERSION ad ogni deploy che tocca gli asset statici: forza
  * i client con una versione vecchia in cache a scaricare quella nuova.
  */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `badgeapp-shell-${CACHE_VERSION}`;
 
 const SHELL_ASSETS = [
@@ -52,20 +60,18 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => cached); // offline: usa la cache se disponibile
-
-      // Stale-while-revalidate: risposta immediata dalla cache se c'è,
-      // aggiornamento in background per la prossima visita.
-      return cached || network;
-    })
+    // cache: 'no-store' bypassa anche la cache HTTP del browser (Last-Modified/
+    // ETag), non solo la Cache Storage del service worker: altrimenti una
+    // risposta 304 Not Modified può far credere "aggiornato" un contenuto che
+    // in realtà il browser non ha mai riscaricato dopo un deploy.
+    fetch(req, { cache: 'no-store' })
+      .then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req)) // offline (o rete assente): fallback alla cache
   );
 });

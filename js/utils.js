@@ -48,6 +48,20 @@ export function enumerateDatesInRange(startStr, endStr) {
     return out;
 }
 
+/**
+ * Giorni lavorativi (lun-ven) da startStr a endStr, estremi inclusi.
+ * Nessuno "consuma" un giorno di ferie per un sabato/domenica in cui
+ * comunque non lavorerebbe: il conteggio mostrato al dipendente e
+ * all'admin deve riflettere questo, anche se l'intervallo Dal/Al scelto
+ * nel modulo può includere il weekend (es. "dal venerdì al lunedì").
+ */
+export function countBusinessDays(startStr, endStr) {
+    return enumerateDatesInRange(startStr, endStr).filter((d) => {
+        const day = new Date(d + "T12:00:00").getDay(); // 0 = domenica, 6 = sabato
+        return day !== 0 && day !== 6;
+    }).length;
+}
+
 export function isRlsPolicyError(error) {
     if (!error) return false;
     const text = `${error.message || ""} ${error.details || ""} ${error.hint || ""}`.toLowerCase();

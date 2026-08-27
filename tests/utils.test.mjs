@@ -6,6 +6,7 @@ import {
   getLocalDateString,
   getTodayDateString,
   enumerateDatesInRange,
+  countBusinessDays,
   isRlsPolicyError,
   normalizeTimeForInput,
   timeToMinutes,
@@ -74,6 +75,26 @@ test('enumerateDatesInRange su intervallo invertito o input mancante restituisce
   assert.deepEqual(enumerateDatesInRange('', '2026-03-01'), []);
   assert.deepEqual(enumerateDatesInRange('2026-03-01', ''), []);
   assert.deepEqual(enumerateDatesInRange(null, null), []);
+});
+
+test('countBusinessDays esclude sabato e domenica dal conteggio', () => {
+  // 2026-08-01 è sabato, 2026-08-16 è domenica: 16 giorni di calendario,
+  // 6 di weekend (1,2,8,9,15,16) → 10 giorni lavorativi.
+  assert.equal(countBusinessDays('2026-08-01', '2026-08-16'), 10);
+});
+
+test('countBusinessDays su una sola settimana lavorativa (lun-ven) conta tutti i giorni', () => {
+  // 2026-08-03 è lunedì, 2026-08-07 è venerdì.
+  assert.equal(countBusinessDays('2026-08-03', '2026-08-07'), 5);
+});
+
+test('countBusinessDays su un solo weekend restituisce 0', () => {
+  // 2026-08-08 sabato, 2026-08-09 domenica.
+  assert.equal(countBusinessDays('2026-08-08', '2026-08-09'), 0);
+});
+
+test('countBusinessDays su un solo giorno feriale conta 1', () => {
+  assert.equal(countBusinessDays('2026-08-03', '2026-08-03'), 1);
 });
 
 test('normalizeTimeForInput accetta HH:MM e HH:MM:SS e normalizza sempre a HH:MM:SS', () => {

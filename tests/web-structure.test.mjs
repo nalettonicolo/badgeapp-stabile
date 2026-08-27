@@ -98,6 +98,29 @@ test('sw.js non intercetta mai richieste cross-origin (Supabase/CDN)', () => {
   assert.match(sw, /url\.origin\s*!==\s*self\.location\.origin/);
 });
 
+test('sw.js usa network-first per l\'app shell (mai stale-while-revalidate)', () => {
+  // Regressione osservata durante lo sviluppo: con "cached || network" un
+  // tester online continuava a vedere una versione vecchia della pagina.
+  const sw = readFileSync(join(root, 'sw.js'), 'utf8');
+  assert.doesNotMatch(sw, /cached \|\| network/);
+  assert.match(sw, /\.catch\(\(\) => caches\.match\(req\)\)/);
+});
+
+test('sw.js bypassa anche la cache HTTP del browser, non solo la Cache Storage', () => {
+  // Regressione osservata durante lo sviluppo: "network-first" a livello di
+  // service worker non basta da solo — un fetch() senza cache:'no-store' può
+  // comunque ricevere un 304 Not Modified dalla cache HTTP del browser e
+  // mostrare contenuto vecchio anche quando il server ne ha uno nuovo.
+  const sw = readFileSync(join(root, 'sw.js'), 'utf8');
+  assert.match(sw, /fetch\(req,\s*\{\s*cache:\s*['"]no-store['"]\s*\}\)/);
+});
+
+test('il conteggio giorni delle ferie esclude sabato e domenica, non i giorni di calendario', () => {
+  const js = extractInlineModuleScript();
+  assert.match(js, /countBusinessDays\(row\.start_date, row\.end_date\)/);
+  assert.match(js, /countBusinessDays\(req\.start_date, req\.end_date\)/);
+});
+
 test('index.html carica Leaflet e Leaflet.draw (mappa area geofence)', () => {
   assert.match(html, /leaflet@1\.9\.4\/dist\/leaflet\.js/);
   assert.match(html, /leaflet-draw@1\.0\.4\/dist\/leaflet\.draw\.js/);

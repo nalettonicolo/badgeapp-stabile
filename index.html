@@ -425,6 +425,7 @@
             isInsideGeofence,
             hasUsableGeofence,
             enumerateDatesInRange,
+            countBusinessDays,
         } from './js/utils.js';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -1262,8 +1263,10 @@
                     extra = ` (${row.trasferta_scope === "TE" ? "Estero" : "Italia"})`;
                 }
                 if (row.request_type === "ferie") {
-                    const days = inclusiveCalendarDays(row.start_date, row.end_date);
-                    if (days > 0) extra = ` — ${days} giorni`;
+                    // Esclude sabato/domenica: nessuno "consuma" un giorno di ferie
+                    // per un weekend in cui comunque non lavorerebbe.
+                    const days = countBusinessDays(row.start_date, row.end_date);
+                    if (days > 0) extra = ` — ${days} giorni lavorativi`;
                 }
                 const st = STATUS_LABELS[row.status] || row.status;
                 const note = row.note
@@ -1802,6 +1805,9 @@
                 let extra = '';
                 if (req.request_type === 'trasferta' && req.trasferta_scope) {
                     extra = ` (${req.trasferta_scope === 'TE' ? 'Estero' : 'Italia'})`;
+                } else if (req.request_type === 'ferie') {
+                    const days = countBusinessDays(req.start_date, req.end_date);
+                    if (days > 0) extra = ` — ${days} giorni lavorativi`;
                 }
                 const note = req.note
                     ? `<div style="font-size:0.8rem;color:#6b7280;margin-top:2px;">${String(req.note).slice(0, 150)}</div>`
