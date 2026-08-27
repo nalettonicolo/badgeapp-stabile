@@ -28,6 +28,7 @@ const REQUIRED_IDS = [
   'geofence-map',
   'geofence-save-btn',
   'geofence-clear-btn',
+  'pending-requests-ul',
 ];
 
 for (const id of REQUIRED_IDS) {
@@ -112,4 +113,12 @@ test('la timbratura automatica per posizione tocca solo il campo di ingresso mat
   assert.match(js, /async function attemptAutoMorningPunch/);
   // Deve derivare il campo da punchSteps[0] (iniziomattina), mai un altro passo.
   assert.match(js, /punchSteps\[0\]\.field/);
+});
+
+test('il flusso di approvazione richieste esiste ed esclude le rifiutate dal calendario', () => {
+  const js = extractInlineModuleScript();
+  assert.match(js, /async function loadPendingRequests/);
+  assert.match(js, /async function updateRequestStatus/);
+  // Le richieste rifiutate non devono comparire come assenza nello storico.
+  assert.match(js, /\.neq\(\s*["']status["'],\s*["']rejected["']\s*\)/);
 });

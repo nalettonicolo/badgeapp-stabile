@@ -32,6 +32,22 @@ export function getTodayDateString() {
     return getLocalDateString();
 }
 
+/** Tutte le date (YYYY-MM-DD) da startStr a endStr, estremi inclusi. Array vuoto su input non valido/invertito. */
+export function enumerateDatesInRange(startStr, endStr) {
+    const out = [];
+    if (!startStr || !endStr) return out;
+    let cursor = new Date(startStr + "T12:00:00");
+    const end = new Date(endStr + "T12:00:00");
+    if (Number.isNaN(cursor.getTime()) || Number.isNaN(end.getTime())) return out;
+    let guard = 0;
+    while (cursor <= end && guard < 3660) { // ~10 anni di margine, non blocca mai su input plausibili
+        out.push(getLocalDateString(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+        guard++;
+    }
+    return out;
+}
+
 export function isRlsPolicyError(error) {
     if (!error) return false;
     const text = `${error.message || ""} ${error.details || ""} ${error.hint || ""}`.toLowerCase();

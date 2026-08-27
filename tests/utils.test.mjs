@@ -5,6 +5,7 @@ import {
   isLikelyNetworkError,
   getLocalDateString,
   getTodayDateString,
+  enumerateDatesInRange,
   isRlsPolicyError,
   normalizeTimeForInput,
   timeToMinutes,
@@ -54,6 +55,25 @@ test('getLocalDateString aggiunge lo zero iniziale a mese e giorno', () => {
 
 test('getTodayDateString delega a getLocalDateString con la data corrente', () => {
   assert.equal(getTodayDateString(), getLocalDateString());
+});
+
+test('enumerateDatesInRange restituisce tutte le date incluse gli estremi', () => {
+  assert.deepEqual(enumerateDatesInRange('2026-03-01', '2026-03-01'), ['2026-03-01']);
+  assert.deepEqual(enumerateDatesInRange('2026-03-01', '2026-03-04'), [
+    '2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04',
+  ]);
+});
+
+test('enumerateDatesInRange attraversa correttamente un cambio di mese', () => {
+  const dates = enumerateDatesInRange('2026-01-30', '2026-02-02');
+  assert.deepEqual(dates, ['2026-01-30', '2026-01-31', '2026-02-01', '2026-02-02']);
+});
+
+test('enumerateDatesInRange su intervallo invertito o input mancante restituisce array vuoto', () => {
+  assert.deepEqual(enumerateDatesInRange('2026-03-05', '2026-03-01'), []);
+  assert.deepEqual(enumerateDatesInRange('', '2026-03-01'), []);
+  assert.deepEqual(enumerateDatesInRange('2026-03-01', ''), []);
+  assert.deepEqual(enumerateDatesInRange(null, null), []);
 });
 
 test('normalizeTimeForInput accetta HH:MM e HH:MM:SS e normalizza sempre a HH:MM:SS', () => {

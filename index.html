@@ -271,6 +271,16 @@
             </div>
         </div>
 
+        <div style="border: 1px solid #d1d5db; border-radius: 12px; padding: 20px; background-color: #f9fafb; margin-bottom: 20px;">
+            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #0891b2;">Richieste da approvare</h3>
+            <p style="font-size: 0.85rem; color: #6b7280; margin: 0 0 10px 0;">
+                Malattia, trasferta e ferie inviate dai dipendenti. Approva o rifiuta: lo stato si aggiorna anche nello storico timbrature del dipendente e nella sua lista «Ultime richieste».
+            </p>
+            <ul id="pending-requests-ul">
+                <li style="color: #6b7280;">Caricamento...</li>
+            </ul>
+        </div>
+
         <div style="border: 1px solid #d1d5db;
             border-radius: 12px; padding: 20px; background-color: #f9fafb;">
             <h3 style="font-size: 1.25rem;
@@ -414,6 +424,7 @@
             overlapDaysInMonthRange,
             isInsideGeofence,
             hasUsableGeofence,
+            enumerateDatesInRange,
         } from './js/utils.js';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -486,7 +497,8 @@
         // Elementi DOM (CONTROLS & INFO)
         const userNameEl = document.getElementById("user-name");
         const userEmailEl = document.getElementById("user-email");
-        const profilesUl = document.getElementById("profiles-ul"); 
+        const profilesUl = document.getElementById("profiles-ul");
+        const pendingRequestsUl = document.getElementById("pending-requests-ul");
         const timbraBtn = document.getElementById("timbraBtn");
         const timbraMessageEl = document.getElementById("timbra-message");
         const historyBtn = document.getElementById("history-btn");
@@ -661,6 +673,7 @@
                 loadPunchesHistory(userId, monthSelect.value, userName);
             } else if (!adminView.classList.contains("hidden") && isAdmin) {
                 loadAllProfiles();
+                loadPendingRequests();
             }
         }
 
@@ -681,6 +694,7 @@
             if (v === "admin-view" && isAdmin) {
                 showView(adminView);
                 loadAllProfiles();
+                loadPendingRequests();
                 initGeofenceMapIfNeeded();
                 return;
             }
@@ -1411,7 +1425,7 @@
             }
 
             try {
-            const [punchResult, trasfertaExtraMinutes] = await Promise.all([
+            const [punchResult, trasfertaExtraMinutes, requestsResult] = await Promise.all([
                 supabase
                     .from("daily_punches")
                     .select("*")
@@ -1420,6 +1434,15 @@
                     .lte("punch_date", endDate)
                     .order("punch_date", { ascending: true }),
                 fetchTrasfertaExtraMinutesForMonth(userId, year, month),
+                // Malattia/trasferta/ferie non rifiutate che toccano il mese: servono per
+                // segnalare nel calendario anche i giorni senza alcuna timbratura (es. ferie).
+                supabase
+                    .from("employee_requests")
+                    .select("request_type, start_date, end_date, status")
+                    .eq("user_id", userId)
+                    .neq("status", "rejected")
+                    .lte("start_date", endDate)
+                    .gte("end_date", startDate),
             ]);
             if (historyGen !== loadHistoryGen) return;
 
@@ -1434,7 +1457,22 @@
 
             const list = punches || [];
 
-            if (list.length === 0) {
+            if (requestsResult.error) {
+                console.warn("Richieste del mese (calendario):", requestsResult.error);
+            }
+
+            // Una richiesta copre più giorni: mappata per data per un lookup immediato
+            // in fase di rendering (un giorno coperto da più richieste tiene l'ultima).
+            const requestsByDate = {};
+            for (const req of (requestsResult.data || [])) {
+                const lo = req.start_date > startDate ? req.start_date : startDate;
+                const hi = req.end_date < endDate ? req.end_date : endDate;
+                for (const d of enumerateDatesInRange(lo, hi)) {
+                    requestsByDate[d] = req;
+                }
+            }
+
+            if (list.length === 0 && Object.keys(requestsByDate).length === 0) {
                 punchesTableContainer.innerHTML = '<p style="text-align: center; color: #6b7280;">Nessuna timbratura trovata per il mese selezionato.</p>';
                 updateMonthlySummary(null, 0, 0, 0, trasfertaExtraMinutes);
                 return;
@@ -1460,46 +1498,85 @@
             let totalWorkMinutes = 0;
             let completedDays = 0;
             let totalPositiveExtraMinutes = 0;
-            
-            list.forEach(punch => {
-                const workMinutes = calculateWorkMinutes(punch);
-                let extraMinutes = 0;
-                // Condizioni per considerare un giorno come 'completo' e idoneo al calcolo straordinario:
-                const hasAllFour = punch.iniziomattina && punch.finemattina && punch.iniziopomeriggio && punch.finepomeriggio;
-                // Caso continuativo (copre i giorni da 13 ore senza pausa registrata):
-                const hasStartEndOnly = punch.iniziomattina && punch.finepomeriggio && !punch.finemattina && !punch.iniziopomeriggio;
 
-                if (hasAllFour || hasStartEndOnly) {
-                    completedDays++;
-                    extraMinutes = workMinutes - TARGET_WORK_MINUTES; // Calcolo dello straordinario giornaliero
-                    // Accumulo solo dello straordinario positivo per il totale mensile
-                    if (extraMinutes > 0) {
-                        totalPositiveExtraMinutes += extraMinutes;
+            // Colori coerenti con i pulsanti malattia/trasferta/ferie del resto dell'app.
+            const REQUEST_TYPE_COLORS = { malattia: '#e11d48', trasferta: '#ea580c', ferie: '#0d9488' };
+            const REQUEST_ROW_BG = { saved: '#fef9c3', pending: '#fef9c3', approved: '#dcfce7' };
+
+            const punchByDate = {};
+            for (const p of list) punchByDate[p.punch_date] = p;
+
+            // Ordine cronologico su UNA sola tabella: unione dei giorni con
+            // timbrature e dei giorni coperti da una richiesta.
+            const allDates = Array.from(new Set([...list.map(p => p.punch_date), ...Object.keys(requestsByDate)])).sort();
+
+            const fmt = (t) => (t && String(t).trim() !== "" ? normalizeTimeForInput(t) : "-");
+
+            allDates.forEach(dateStr => {
+                const punch = punchByDate[dateStr];
+                const req = requestsByDate[dateStr];
+                const dateLabel = new Date(dateStr).toLocaleDateString('it-IT');
+
+                if (punch) {
+                    const workMinutes = calculateWorkMinutes(punch);
+                    let extraMinutes = 0;
+                    // Condizioni per considerare un giorno come 'completo' e idoneo al calcolo straordinario:
+                    const hasAllFour = punch.iniziomattina && punch.finemattina && punch.iniziopomeriggio && punch.finepomeriggio;
+                    // Caso continuativo (copre i giorni da 13 ore senza pausa registrata):
+                    const hasStartEndOnly = punch.iniziomattina && punch.finepomeriggio && !punch.finemattina && !punch.iniziopomeriggio;
+
+                    if (hasAllFour || hasStartEndOnly) {
+                        completedDays++;
+                        extraMinutes = workMinutes - TARGET_WORK_MINUTES; // Calcolo dello straordinario giornaliero
+                        // Accumulo solo dello straordinario positivo per il totale mensile
+                        if (extraMinutes > 0) {
+                            totalPositiveExtraMinutes += extraMinutes;
+                        }
                     }
+
+                    totalWorkMinutes += workMinutes;
+
+                    const workedHHMM = minutesToHHMM(workMinutes);
+                    const extraHHMM = minutesToHHMM(extraMinutes);
+
+                    // Stile per evidenziare lo straordinario
+                    const extraStyle = extraMinutes > 0 ? 'color: green; font-weight: bold;' : (extraMinutes < 0 ?
+                        'color: red;' : '');
+
+                    // Un giorno può avere sia timbrature sia una richiesta che lo copre
+                    // (es. trasferta con orario parziale registrato): lo segnaliamo comunque.
+                    const badge = req
+                        ? ` <span style="font-size:0.72rem;font-weight:600;color:${REQUEST_TYPE_COLORS[req.request_type] || '#6b7280'};">(${REQUEST_TYPE_LABELS[req.request_type] || req.request_type})</span>`
+                        : '';
+
+                    tableHtml += `
+                        <tr>
+                            <td style="font-weight: 500;">${dateLabel}${badge}</td>
+                            <td>${fmt(punch.iniziomattina)}</td>
+                            <td>${fmt(punch.finemattina)}</td>
+                            <td>${fmt(punch.iniziopomeriggio)}</td>
+                            <td>${fmt(punch.finepomeriggio)}</td>
+                            <td>${punch.pausa_minuti || '0'}</td>
+                            <td style="font-weight: 500;">${workedHHMM}</td>
+                            <td style="background-color: #fef3c7; ${extraStyle}">${extraHHMM}</td>
+                        </tr>
+                    `;
+                } else if (req) {
+                    // Giorno senza alcuna timbratura ma coperto da una richiesta
+                    // (es. ferie): prima non compariva affatto nel calendario.
+                    const typeLabel = REQUEST_TYPE_LABELS[req.request_type] || req.request_type;
+                    const statusLabel = STATUS_LABELS[req.status] || req.status;
+                    const rowBg = REQUEST_ROW_BG[req.status] || '#f3f4f6';
+                    tableHtml += `
+                        <tr style="background-color: ${rowBg};">
+                            <td style="font-weight: 500;">${dateLabel}</td>
+                            <td colspan="7" style="text-align: center;">
+                                <strong style="color: ${REQUEST_TYPE_COLORS[req.request_type] || '#374151'};">${typeLabel}</strong>
+                                <span style="color: #6b7280; margin-left: 8px;">${statusLabel}</span>
+                            </td>
+                        </tr>
+                    `;
                 }
-                
-                totalWorkMinutes += workMinutes;
-
-                const workedHHMM = minutesToHHMM(workMinutes);
-                const extraHHMM = minutesToHHMM(extraMinutes);
-
-                // Stile per evidenziare lo straordinario
-                const extraStyle = extraMinutes > 0 ? 'color: green; font-weight: bold;' : (extraMinutes < 0 ?
-                    'color: red;' : '');
-
-                const fmt = (t) => (t && String(t).trim() !== "" ? normalizeTimeForInput(t) : "-");
-                tableHtml += `
-                    <tr>
-                        <td style="font-weight: 500;">${new Date(punch.punch_date).toLocaleDateString('it-IT')}</td>
-                        <td>${fmt(punch.iniziomattina)}</td>
-                        <td>${fmt(punch.finemattina)}</td>
-                        <td>${fmt(punch.iniziopomeriggio)}</td>
-                        <td>${fmt(punch.finepomeriggio)}</td>
-                        <td>${punch.pausa_minuti || '0'}</td>
-                        <td style="font-weight: 500;">${workedHHMM}</td>
-                        <td style="background-color: #fef3c7; ${extraStyle}">${extraHHMM}</td>
-                    </tr>
-                `;
             });
 
             tableHtml += '</tbody></table>';
@@ -1680,6 +1757,90 @@
                     loadPunchesHistory(userId, monthYear, userName);
                 });
             });
+        }
+
+        /**
+         * Richieste malattia/trasferta/ferie in attesa di una decisione (stato
+         * "saved" o "pending") di TUTTI i dipendenti, con nome/email per contesto.
+         * employee_requests.user_id referenzia auth.users, non profiles: niente
+         * embedding automatico via PostgREST, quindi due query e un join lato client.
+         */
+        async function loadPendingRequests() {
+            if (!isAdmin || !pendingRequestsUl) return;
+            pendingRequestsUl.innerHTML = '<li style="color: #6b7280;">Caricamento...</li>';
+
+            const { data: requests, error } = await supabase
+                .from('employee_requests')
+                .select('id, user_id, request_type, start_date, end_date, note, status, trasferta_scope, travel_hours, total_hours_declared, created_at')
+                .in('status', ['saved', 'pending'])
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error("ERRORE CARICAMENTO RICHIESTE:", error);
+                pendingRequestsUl.innerHTML = `<li style="color: #dc2626;">Errore: ${error.message}</li>`;
+                return;
+            }
+
+            if (!requests || requests.length === 0) {
+                pendingRequestsUl.innerHTML = '<li style="color: #6b7280;">Nessuna richiesta in attesa.</li>';
+                return;
+            }
+
+            const userIds = [...new Set(requests.map(r => r.user_id))];
+            const { data: profs } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name, email')
+                .in('id', userIds);
+            const profileById = Object.fromEntries((profs || []).map(p => [p.id, p]));
+
+            pendingRequestsUl.innerHTML = requests.map(req => {
+                const profile = profileById[req.user_id];
+                const employeeName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email : req.user_id;
+                const tipo = REQUEST_TYPE_LABELS[req.request_type] || req.request_type;
+                const d0 = new Date(req.start_date).toLocaleDateString('it-IT');
+                const d1 = new Date(req.end_date).toLocaleDateString('it-IT');
+                let extra = '';
+                if (req.request_type === 'trasferta' && req.trasferta_scope) {
+                    extra = ` (${req.trasferta_scope === 'TE' ? 'Estero' : 'Italia'})`;
+                }
+                const note = req.note
+                    ? `<div style="font-size:0.8rem;color:#6b7280;margin-top:2px;">${String(req.note).slice(0, 150)}</div>`
+                    : '';
+                return `
+                    <li style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;">
+                        <div>
+                            <strong>${employeeName}</strong> — ${tipo}${extra}: ${d0} – ${d1}
+                            ${note}
+                        </div>
+                        <div style="display:flex; gap:8px; flex-shrink:0;">
+                            <button type="button" class="approve-request-btn" data-request-id="${req.id}" style="background-color:#16a34a; color:white; padding:6px 12px; border-radius:6px; font-size:0.85rem;">Approva</button>
+                            <button type="button" class="reject-request-btn" data-request-id="${req.id}" style="background-color:#dc2626; color:white; padding:6px 12px; border-radius:6px; font-size:0.85rem;">Rifiuta</button>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+
+            pendingRequestsUl.querySelectorAll('.approve-request-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => updateRequestStatus(e.currentTarget.dataset.requestId, 'approved'));
+            });
+            pendingRequestsUl.querySelectorAll('.reject-request-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => updateRequestStatus(e.currentTarget.dataset.requestId, 'rejected'));
+            });
+        }
+
+        async function updateRequestStatus(requestId, newStatus) {
+            if (!isAdmin || !currentUser || !requestId) return;
+            const { error } = await supabase
+                .from('employee_requests')
+                .update({ status: newStatus, reviewed_by: currentUser.id, reviewed_at: new Date().toISOString() })
+                .eq('id', requestId);
+            if (error) {
+                console.error("Aggiornamento stato richiesta:", error);
+                showMessage(`Errore: ${error.message}`, true);
+                return;
+            }
+            showMessage(newStatus === 'approved' ? 'Richiesta approvata.' : 'Richiesta rifiutata.');
+            loadPendingRequests();
         }
 
         // ------------------------------------------------
@@ -1931,6 +2092,7 @@
             if (isAdmin) {
                 showView(adminView);
                 await loadAllProfiles();
+                loadPendingRequests();
                 initGeofenceMapIfNeeded();
             } else {
                 currentHistoryUserId = null;
