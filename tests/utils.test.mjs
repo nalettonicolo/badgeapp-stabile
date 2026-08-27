@@ -13,6 +13,10 @@ import {
   calculateWorkMinutes,
   inclusiveCalendarDays,
   overlapDaysInMonthRange,
+  haversineDistanceMeters,
+  pointInPolygon,
+  isInsideGeofence,
+  hasUsableGeofence,
 } from '../js/utils.js';
 
 test('isLikelyNetworkError riconosce errori di rete', () => {
@@ -160,4 +164,67 @@ test('overlapDaysInMonthRange calcola solo i giorni di sovrapposizione su una tr
 
 test('overlapDaysInMonthRange restituisce 0 se la trasferta non tocca affatto il mese richiesto', () => {
   assert.equal(overlapDaysInMonthRange('2026-01-01', '2026-01-05', 2026, 3), 0);
+});
+
+// -----------------------------------------------------------------------------
+// Geofence
+// -----------------------------------------------------------------------------
+
+test('haversineDistanceMeters: stesso punto è distanza zero', () => {
+  assert.equal(haversineDistanceMeters(45.0, 9.0, 45.0, 9.0), 0);
+});
+
+test('haversineDistanceMeters: un grado di latitudine è ~111km', () => {
+  const d = haversineDistanceMeters(45.0, 9.0, 46.0, 9.0);
+  assert.ok(Math.abs(d - 111195) < 1000, `atteso ~111195m, ottenuto ${d}`);
+});
+
+const SQUARE_POLYGON = [
+  { lat: 45.0000, lng: 9.0000 },
+  { lat: 45.0000, lng: 9.0010 },
+  { lat: 45.0010, lng: 9.0010 },
+  { lat: 45.0010, lng: 9.0000 },
+];
+
+test('pointInPolygon: un punto al centro del poligono è dentro', () => {
+  assert.equal(pointInPolygon(45.0005, 9.0005, SQUARE_POLYGON), true);
+});
+
+test('pointInPolygon: un punto lontano è fuori', () => {
+  assert.equal(pointInPolygon(46.0, 10.0, SQUARE_POLYGON), false);
+});
+
+test('pointInPolygon: meno di 3 punti o input non valido non è mai "dentro"', () => {
+  assert.equal(pointInPolygon(45.0005, 9.0005, [{ lat: 45, lng: 9 }]), false);
+  assert.equal(pointInPolygon(45.0005, 9.0005, null), false);
+  assert.equal(pointInPolygon(45.0005, 9.0005, []), false);
+});
+
+test('isInsideGeofence: usa il poligono quando presente (>=3 punti), ignora il cerchio', () => {
+  const settings = { polygon_path: SQUARE_POLYGON, center_lat: 0, center_lng: 0, radius_entry_meters: 120 };
+  assert.equal(isInsideGeofence(45.0005, 9.0005, settings), true);
+  assert.equal(isInsideGeofence(46.0, 10.0, settings), false);
+});
+
+test('isInsideGeofence: usa il cerchio come fallback quando manca il poligono', () => {
+  const settings = { polygon_path: [], center_lat: 45.0, center_lng: 9.0, radius_entry_meters: 100 };
+  assert.equal(isInsideGeofence(45.0, 9.0, settings), true); // al centro esatto
+  assert.equal(isInsideGeofence(46.0, 10.0, settings), false); // lontanissimo
+});
+
+test('isInsideGeofence: nessuna area configurata (poligono vuoto, centro 0,0) è sempre falso', () => {
+  const settings = { polygon_path: [], center_lat: 0, center_lng: 0, radius_entry_meters: 120 };
+  assert.equal(isInsideGeofence(45.0, 9.0, settings), false);
+  assert.equal(isInsideGeofence(0, 0, settings), false); // anche esattamente sul punto "non configurato"
+});
+
+test('isInsideGeofence: settings nullo/assente è sempre falso', () => {
+  assert.equal(isInsideGeofence(45.0, 9.0, null), false);
+});
+
+test('hasUsableGeofence: rispecchia la logica di isInsideGeofence sulla disponibilità dell\'area', () => {
+  assert.equal(hasUsableGeofence({ polygon_path: SQUARE_POLYGON, center_lat: 0, center_lng: 0 }), true);
+  assert.equal(hasUsableGeofence({ polygon_path: [], center_lat: 45.0, center_lng: 9.0 }), true);
+  assert.equal(hasUsableGeofence({ polygon_path: [], center_lat: 0, center_lng: 0 }), false);
+  assert.equal(hasUsableGeofence(null), false);
 });

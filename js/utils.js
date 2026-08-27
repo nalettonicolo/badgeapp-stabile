@@ -138,3 +138,75 @@ export function overlapDaysInMonthRange(startStr, endStr, year, month) {
     if (lo > hi) return 0;
     return inclusiveCalendarDays(lo, hi);
 }
+
+// -----------------------------------------------------------------------------
+// Geofence — timbratura automatica per posizione (ingresso mattutino, opt-in)
+// -----------------------------------------------------------------------------
+
+/** Distanza in metri tra due punti lat/lng (formula haversine). */
+export function haversineDistanceMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000; // raggio terrestre medio in metri
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+/**
+ * Punto-in-poligono (ray casting). `polygon` è un array di {lat, lng} che
+ * rappresenta un anello semplice (non serve chiuderlo esplicitamente).
+ * Precisione planare: adeguata per aree piccole (sede/cortile), non per
+ * poligoni di scala geografica.
+ */
+export function pointInPolygon(lat, lng, polygon) {
+    if (!Array.isArray(polygon) || polygon.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const pi = polygon[i];
+        const pj = polygon[j];
+        if (!pi || !pj) continue;
+        const xi = pi.lng, yi = pi.lat;
+        const xj = pj.lng, yj = pj.lat;
+        const intersects =
+            (yi > lat) !== (yj > lat) &&
+            lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+        if (intersects) inside = !inside;
+    }
+    return inside;
+}
+
+/**
+ * True se (lat, lng) è dentro l'area di timbratura automatica configurata.
+ * Preferisce il poligono disegnato (`settings.polygon_path`, >= 3 punti); in
+ * assenza usa il cerchio (`center_lat`/`center_lng` + `radius_entry_meters`),
+ * per compatibilità con un eventuale ripristino della vecchia modalità solo-cerchio.
+ */
+export function isInsideGeofence(lat, lng, settings) {
+    if (!settings) return false;
+    const polygon = Array.isArray(settings.polygon_path) ? settings.polygon_path : [];
+    if (polygon.length >= 3) {
+        return pointInPolygon(lat, lng, polygon);
+    }
+    const { center_lat, center_lng, radius_entry_meters } = settings;
+    if (
+        !Number.isFinite(center_lat) || !Number.isFinite(center_lng) ||
+        (center_lat === 0 && center_lng === 0) // 0,0 = non configurato
+    ) {
+        return false;
+    }
+    const radius = Number.isFinite(radius_entry_meters) ? radius_entry_meters : 120;
+    return haversineDistanceMeters(lat, lng, center_lat, center_lng) <= radius;
+}
+
+/** True se la configurazione dell'area è utilizzabile (poligono o cerchio validi). */
+export function hasUsableGeofence(settings) {
+    if (!settings) return false;
+    const polygon = Array.isArray(settings.polygon_path) ? settings.polygon_path : [];
+    if (polygon.length >= 3) return true;
+    const { center_lat, center_lng } = settings;
+    return Number.isFinite(center_lat) && Number.isFinite(center_lng) && !(center_lat === 0 && center_lng === 0);
+}

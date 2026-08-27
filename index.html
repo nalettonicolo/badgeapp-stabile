@@ -10,6 +10,9 @@
     <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="stylesheet" href="styles.css" />
+    <!-- Mappa per l'area di timbratura automatica (solo pannello admin) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 </head>
 <body>
 
@@ -147,6 +150,17 @@
                     <button type="button" id="req-ferie-btn" style="background-color: #0d9488; color: white;">Ferie</button>
                 </div>
             </div>
+            <div id="geo-autopunch-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="geo-autopunch-toggle" style="width: auto;" />
+                    <label for="geo-autopunch-toggle" style="font-weight: 600; font-size: 0.9rem; color: #374151;">Timbra automaticamente l'ingresso mattutino quando entro in sede</label>
+                </div>
+                <p style="font-size: 0.78rem; color: #6b7280; margin: 0.35rem 0 0 26px; line-height: 1.4;">
+                    Richiede il permesso di localizzazione del browser e funziona solo con questa pagina aperta (non ad app chiusa).
+                    Timbra solo l'ingresso mattutino, una volta al giorno, e solo se l'amministratore ha configurato un'area.
+                </p>
+                <p id="geo-autopunch-status" style="font-size: 0.78rem; color: #6b7280; margin: 0.35rem 0 0 26px;"></p>
+            </div>
             <p id="timbra-message" style="text-align: center;
                 margin-top: 0.5rem; font-size: 0.875rem; color: #4b5563; min-height: 1.25rem;"></p>
         </div>
@@ -236,6 +250,24 @@
                     <button type="submit" style="background-color: #f97316;
                         color: white;">Invia Email Reset Password</button>
                 </form>
+            </div>
+        </div>
+
+        <div style="border: 1px solid #d1d5db; border-radius: 12px; padding: 20px; background-color: #f9fafb; margin-bottom: 20px;">
+            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #7c3aed;">Area timbratura automatica (posizione)</h3>
+            <p style="font-size: 0.85rem; color: #6b7280; margin: 0 0 10px 0; line-height: 1.4;">
+                Disegna l'area (es. il perimetro della sede): un dipendente con la timbratura automatica attiva e l'ingresso mattutino non ancora registrato lo vedrà timbrato da solo entrandovi.
+                Cerca un indirizzo per centrare la mappa, poi usa lo strumento poligono (icona a sinistra sulla mappa) per disegnarla e premi «Salva area».
+            </p>
+            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                <input type="text" id="geofence-address-search" placeholder="Cerca un indirizzo per centrare la mappa…" style="flex: 1;" />
+                <button type="button" id="geofence-address-search-btn" style="background-color: #6366f1; color: white; white-space: nowrap;">Cerca</button>
+            </div>
+            <div id="geofence-map" style="height: 360px; border-radius: 8px; border: 1px solid #d1d5db;"></div>
+            <div style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: center;">
+                <button type="button" id="geofence-save-btn" style="background-color: #7c3aed; color: white;">Salva area</button>
+                <button type="button" id="geofence-clear-btn" style="background-color: #6b7280; color: white;">Rimuovi area</button>
+                <span id="geofence-status" style="font-size: 0.85rem; color: #6b7280;"></span>
             </div>
         </div>
 
@@ -363,6 +395,10 @@
         </div>
     </div>
 
+    <!-- Mappa per l'area di timbratura automatica (solo pannello admin) -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
     <script type="module">
         import {
             isLikelyNetworkError,
@@ -376,6 +412,8 @@
             calculateWorkMinutes,
             inclusiveCalendarDays,
             overlapDaysInMonthRange,
+            isInsideGeofence,
+            hasUsableGeofence,
         } from './js/utils.js';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -466,6 +504,16 @@
         const backFromHistoryFooterBtn = document.getElementById("back-from-history-footer-btn");
         const backFromAdminFooterBtn = document.getElementById("back-from-admin-footer-btn");
 
+        // Timbratura automatica per posizione DOM
+        const geoAutoPunchToggle = document.getElementById("geo-autopunch-toggle");
+        const geoAutoPunchStatusEl = document.getElementById("geo-autopunch-status");
+        const geofenceMapEl = document.getElementById("geofence-map");
+        const geofenceAddressSearchInput = document.getElementById("geofence-address-search");
+        const geofenceAddressSearchBtn = document.getElementById("geofence-address-search-btn");
+        const geofenceSaveBtn = document.getElementById("geofence-save-btn");
+        const geofenceClearBtn = document.getElementById("geofence-clear-btn");
+        const geofenceStatusEl = document.getElementById("geofence-status");
+
         // Timbratura Manuale DOM
         const manualPunchModal = document.getElementById("manual-punch-modal");
         const manualPunchBtn = document.getElementById("manual-punch-btn");
@@ -546,7 +594,16 @@
         let monthSelectDebounce = null;
         let currentHistoryUserId = null;
         let autoPunchInProgress = false;
-        const allViews = [loginView, punchView, historyView, adminView]; 
+        const allViews = [loginView, punchView, historyView, adminView];
+
+        // Timbratura automatica per posizione (solo ingresso mattutino, opt-in)
+        const GEO_AUTOPUNCH_STORAGE_KEY = "badgeapp-geo-autopunch-enabled-v1";
+        let geofenceSettingsCache = null;
+        let geoWatchId = null;
+        let wasInsideGeofence = null;
+        // Mappa admin per disegnare l'area (inizializzata solo quando si apre il pannello)
+        let geofenceMap = null;
+        let geofenceDrawnItems = null;
 
         // Mappa gli stati con i nomi dei campi
         const punchSteps = [
@@ -624,6 +681,7 @@
             if (v === "admin-view" && isAdmin) {
                 showView(adminView);
                 loadAllProfiles();
+                initGeofenceMapIfNeeded();
                 return;
             }
             showView(punchView);
@@ -698,6 +756,298 @@
 
             showMessage(`Timbratura ${step.field} registrata: ${nowTime}`);
             await loadPunches();
+        }
+
+        // ------------------------------------------------
+        // 🔹 Timbratura automatica per posizione (solo ingresso mattutino, opt-in)
+        // ------------------------------------------------
+
+        function isGeoAutoPunchEnabled() {
+            try {
+                return localStorage.getItem(GEO_AUTOPUNCH_STORAGE_KEY) === "1";
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function persistGeoAutoPunchEnabled(enabled) {
+            try {
+                if (enabled) localStorage.setItem(GEO_AUTOPUNCH_STORAGE_KEY, "1");
+                else localStorage.removeItem(GEO_AUTOPUNCH_STORAGE_KEY);
+            } catch (_) { /* storage non disponibile: il toggle resta solo per questa sessione */ }
+        }
+
+        /** Ricarica sempre da Supabase (la cache viene invalidata dall'admin al salvataggio/rimozione area). */
+        async function loadGeofenceSettings() {
+            const { data, error } = await supabase
+                .from("geofence_settings")
+                .select("polygon_path, center_lat, center_lng, radius_entry_meters, max_accuracy_meters, updated_at")
+                .eq("id", 1)
+                .maybeSingle();
+            if (error) {
+                console.warn("Impossibile caricare l'area di timbratura automatica:", error);
+                geofenceSettingsCache = null;
+                return null;
+            }
+            geofenceSettingsCache = data;
+            return data;
+        }
+
+        function stopGeoAutoPunchWatch() {
+            if (geoWatchId != null && "geolocation" in navigator) {
+                navigator.geolocation.clearWatch(geoWatchId);
+            }
+            geoWatchId = null;
+            wasInsideGeofence = null;
+        }
+
+        /**
+         * Verifica (con una query fresca, non con lo stato di UI eventualmente non
+         * aggiornato) se manca ancora l'ingresso mattutino di oggi, e in tal caso lo
+         * timbra. Disaccoppiato da quale vista è aperta al momento: il rilevamento
+         * della posizione deve funzionare anche se il dipendente è sullo storico.
+         */
+        async function attemptAutoMorningPunch() {
+            if (!currentUser || autoPunchInProgress) return;
+            const morningField = punchSteps[0].field; // "iniziomattina"
+            const today = getTodayDateString();
+
+            const { data, error } = await supabase
+                .from("daily_punches")
+                .select(morningField)
+                .eq("user_id", currentUser.id)
+                .eq("punch_date", today)
+                .maybeSingle();
+            if (error) {
+                console.warn("Timbratura automatica: verifica stato odierno fallita, riprovo al prossimo rilevamento.", error);
+                return;
+            }
+            if (data && data[morningField]) return; // già timbrato oggi, non fare nulla
+
+            autoPunchInProgress = true;
+            const nowTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
+            const { error: upsertError } = await upsertPunch(today, morningField, nowTime);
+            autoPunchInProgress = false;
+
+            if (upsertError) {
+                console.error("Timbratura automatica per posizione fallita:", upsertError);
+                showMessage("Timbratura automatica per posizione non riuscita. Puoi timbrare manualmente.", true);
+                return;
+            }
+            showMessage(`Timbratura automatica: ingresso registrato per posizione (${nowTime}).`);
+            if (!punchView.classList.contains("hidden")) {
+                loadPunches();
+            }
+        }
+
+        async function startGeoAutoPunchWatch() {
+            if (!("geolocation" in navigator)) {
+                showMessage("Questo browser non supporta la geolocalizzazione.", true);
+                return false;
+            }
+            const settings = geofenceSettingsCache || await loadGeofenceSettings();
+            if (!hasUsableGeofence(settings)) {
+                if (geoAutoPunchStatusEl) {
+                    geoAutoPunchStatusEl.textContent = "Nessuna area configurata dall'amministratore: la timbratura automatica resta inattiva.";
+                }
+                return false;
+            }
+            stopGeoAutoPunchWatch();
+            geoWatchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const { latitude, longitude, accuracy } = pos.coords;
+                    const maxAcc = Number.isFinite(settings.max_accuracy_meters) ? settings.max_accuracy_meters : 60;
+                    if (Number.isFinite(accuracy) && accuracy > maxAcc) return; // lettura troppo imprecisa: ignorata, niente cambio di stato
+                    const insideNow = isInsideGeofence(latitude, longitude, settings);
+                    if (wasInsideGeofence === false && insideNow === true) {
+                        attemptAutoMorningPunch();
+                    }
+                    wasInsideGeofence = insideNow;
+                    if (geoAutoPunchStatusEl) {
+                        geoAutoPunchStatusEl.textContent = insideNow
+                            ? "Sei nell'area: se manca l'ingresso mattutino verrà timbrato a breve."
+                            : "Attiva — in attesa che tu entri nell'area.";
+                    }
+                },
+                (err) => {
+                    console.warn("Geolocalizzazione non disponibile:", err);
+                    if (geoAutoPunchStatusEl) {
+                        geoAutoPunchStatusEl.textContent = "Posizione non disponibile (permesso negato o GPS spento): timbratura automatica sospesa.";
+                    }
+                    setGeoAutoPunchEnabled(false);
+                },
+                { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+            );
+            if (geoAutoPunchStatusEl) {
+                geoAutoPunchStatusEl.textContent = "Attiva — in attesa che tu entri nell'area.";
+            }
+            return true;
+        }
+
+        function setGeoAutoPunchEnabled(enabled) {
+            persistGeoAutoPunchEnabled(enabled);
+            if (geoAutoPunchToggle) geoAutoPunchToggle.checked = enabled;
+            if (enabled) {
+                startGeoAutoPunchWatch();
+            } else {
+                stopGeoAutoPunchWatch();
+                if (geoAutoPunchStatusEl) geoAutoPunchStatusEl.textContent = "";
+            }
+        }
+
+        /** Da chiamare dopo il login: riattiva silenziosamente il watch se l'utente lo aveva già acceso su questo dispositivo. */
+        function initGeoAutoPunchIfEnabled() {
+            if (geoAutoPunchToggle) geoAutoPunchToggle.checked = isGeoAutoPunchEnabled();
+            if (isGeoAutoPunchEnabled()) {
+                startGeoAutoPunchWatch();
+            }
+        }
+
+        if (geoAutoPunchToggle) {
+            geoAutoPunchToggle.addEventListener("change", (e) => {
+                setGeoAutoPunchEnabled(e.target.checked);
+            });
+        }
+
+        // ------------------------------------------------
+        // 🔹 Pannello admin: disegno dell'area sulla mappa (Leaflet + Leaflet.draw)
+        // ------------------------------------------------
+
+        /** Inizializza la mappa una sola volta; sulle visite successive al pannello admin la fa solo ridimensionare. */
+        function initGeofenceMapIfNeeded() {
+            if (geofenceMap) {
+                geofenceMap.invalidateSize();
+                return;
+            }
+            if (typeof L === "undefined" || !geofenceMapEl) return; // libreria non caricata (offline?): sezione inattiva
+
+            geofenceMap = L.map(geofenceMapEl).setView([41.9028, 12.4964], 6); // Italia, poi ricentrata sull'area salvata
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 19,
+            }).addTo(geofenceMap);
+
+            geofenceDrawnItems = new L.FeatureGroup();
+            geofenceMap.addLayer(geofenceDrawnItems);
+
+            const drawControl = new L.Control.Draw({
+                draw: {
+                    polygon: { allowIntersection: false, showArea: true },
+                    marker: false,
+                    circle: false,
+                    circlemarker: false,
+                    rectangle: false,
+                    polyline: false,
+                },
+                edit: { featureGroup: geofenceDrawnItems, remove: true },
+            });
+            geofenceMap.addControl(drawControl);
+
+            // Una sola area alla volta: un nuovo disegno sostituisce il precedente.
+            geofenceMap.on(L.Draw.Event.CREATED, (e) => {
+                geofenceDrawnItems.clearLayers();
+                geofenceDrawnItems.addLayer(e.layer);
+            });
+
+            loadGeofenceIntoMap();
+        }
+
+        async function loadGeofenceIntoMap() {
+            const settings = await loadGeofenceSettings();
+            if (!geofenceDrawnItems) return;
+            geofenceDrawnItems.clearLayers();
+            if (settings && Array.isArray(settings.polygon_path) && settings.polygon_path.length >= 3) {
+                const latlngs = settings.polygon_path.map((p) => [p.lat, p.lng]);
+                const polygon = L.polygon(latlngs);
+                geofenceDrawnItems.addLayer(polygon);
+                geofenceMap.fitBounds(polygon.getBounds(), { maxZoom: 17 });
+                if (geofenceStatusEl) {
+                    const when = settings.updated_at ? new Date(settings.updated_at).toLocaleString('it-IT') : '';
+                    geofenceStatusEl.textContent = `Area attiva${when ? ` (salvata ${when})` : ''}.`;
+                }
+            } else if (geofenceStatusEl) {
+                geofenceStatusEl.textContent = "Nessuna area configurata.";
+            }
+        }
+
+        if (geofenceAddressSearchBtn) {
+            geofenceAddressSearchBtn.addEventListener("click", async () => {
+                const q = geofenceAddressSearchInput ? geofenceAddressSearchInput.value.trim() : "";
+                if (!q || !geofenceMap) return;
+                try {
+                    const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const results = await resp.json();
+                    if (!results || results.length === 0) {
+                        showMessage("Indirizzo non trovato.", true);
+                        return;
+                    }
+                    const { lat, lon } = results[0];
+                    geofenceMap.setView([parseFloat(lat), parseFloat(lon)], 17);
+                } catch (err) {
+                    console.error("Ricerca indirizzo (Nominatim):", err);
+                    showMessage(isLikelyNetworkError(err) ? "Connessione assente. Riprova tra poco." : "Ricerca indirizzo non riuscita.", true);
+                }
+            });
+        }
+
+        if (geofenceSaveBtn) {
+            geofenceSaveBtn.addEventListener("click", async () => {
+                if (!geofenceDrawnItems) return;
+                const layers = geofenceDrawnItems.getLayers();
+                if (layers.length === 0) {
+                    showMessage("Disegna prima un'area sulla mappa (icona poligono in alto a sinistra).", true);
+                    return;
+                }
+                const latlngs = layers[0].getLatLngs()[0]; // poligono semplice: primo (e unico) anello
+                if (!latlngs || latlngs.length < 3) {
+                    showMessage("Il poligono disegnato non è valido: servono almeno 3 punti.", true);
+                    return;
+                }
+                const polygonPath = latlngs.map((p) => ({ lat: p.lat, lng: p.lng }));
+                const centroid = polygonPath.reduce(
+                    (acc, p) => ({ lat: acc.lat + p.lat / polygonPath.length, lng: acc.lng + p.lng / polygonPath.length }),
+                    { lat: 0, lng: 0 }
+                );
+
+                const { error } = await supabase.from("geofence_settings").upsert({
+                    id: 1,
+                    updated_by: currentUser.id,
+                    polygon_path: polygonPath,
+                    center_lat: centroid.lat,
+                    center_lng: centroid.lng,
+                });
+                if (error) {
+                    console.error("Salvataggio area:", error);
+                    showMessage(`Errore salvataggio area: ${error.message}`, true);
+                    return;
+                }
+                showMessage("Area salvata.");
+                geofenceSettingsCache = null; // i dipendenti la ricaricano al prossimo avvio del watch
+                loadGeofenceIntoMap();
+            });
+        }
+
+        if (geofenceClearBtn) {
+            geofenceClearBtn.addEventListener("click", async () => {
+                if (!window.confirm("Rimuovere l'area di timbratura automatica? I dipendenti non potranno più usarla finché non ne configuri una nuova.")) return;
+                const { error } = await supabase.from("geofence_settings").upsert({
+                    id: 1,
+                    updated_by: currentUser.id,
+                    polygon_path: [],
+                    center_lat: 0,
+                    center_lng: 0,
+                });
+                if (error) {
+                    console.error("Rimozione area:", error);
+                    showMessage(`Errore: ${error.message}`, true);
+                    return;
+                }
+                if (geofenceDrawnItems) geofenceDrawnItems.clearLayers();
+                geofenceSettingsCache = null;
+                showMessage("Area rimossa.");
+                if (geofenceStatusEl) geofenceStatusEl.textContent = "Nessuna area configurata.";
+            });
         }
 
         const VIEW_STORAGE_KEY = "badgeapp-active-view-v1";
@@ -1238,6 +1588,7 @@
                     if (shouldRestoreView) {
                         hasInitializedAppView = true;
                         restoreViewAfterLogin();
+                        initGeoAutoPunchIfEnabled();
                     } else {
                         refreshCurrentViewData();
                     }
@@ -1245,6 +1596,7 @@
                     currentUser = null;
                     isAdmin = false;
                     hasInitializedAppView = false;
+                    stopGeoAutoPunchWatch();
                     showView(loginView);
                 }
             } catch (err) {
@@ -1579,6 +1931,7 @@
             if (isAdmin) {
                 showView(adminView);
                 await loadAllProfiles();
+                initGeofenceMapIfNeeded();
             } else {
                 currentHistoryUserId = null;
                 historyTitlePrefixEl.textContent = "Storico Timbrature";

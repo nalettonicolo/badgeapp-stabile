@@ -800,6 +800,28 @@ CREATE POLICY audit_log_select_admin_only
   ON public.audit_log FOR SELECT TO authenticated
   USING (public.is_admin(auth.uid()));
 
+-- -----------------------------------------------------------------------------
+-- 13) geofence_settings torna in uso attivo: timbratura automatica per posizione
+--
+-- La geolocalizzazione era stata rimossa dall'app; viene reintrodotta in forma
+-- opt-in (il dipendente attiva un interruttore, per browser/dispositivo) e
+-- limitata: solo rilevamento dell'ingresso nell'area per timbrare
+-- automaticamente il SOLO ingresso mattutino (non le altre 3 timbrature).
+-- L'area è un poligono disegnato dall'admin (polygon_path, già presente nello
+-- schema), con fallback a cerchio (center_lat/lng + radius_entry_meters) se il
+-- poligono non è impostato.
+--
+-- Mancava una policy INSERT: la riga id=1 esiste già su questo progetto (mai
+-- stata cancellata), ma su un progetto ricreato da zero l'upsert dell'admin
+-- fallirebbe al primo salvataggio senza questa policy.
+-- -----------------------------------------------------------------------------
+DROP POLICY IF EXISTS geofence_insert_admin ON public.geofence_settings;
+CREATE POLICY geofence_insert_admin
+  ON public.geofence_settings FOR INSERT TO authenticated
+  WITH CHECK (public.is_admin(auth.uid()));
+
+COMMENT ON TABLE public.geofence_settings IS 'Area (poligono disegnato dall''admin) per la timbratura automatica opt-in del solo ingresso mattutino via geolocalizzazione browser.';
+
 -- =============================================================================
 -- Fine
 -- =============================================================================

@@ -24,6 +24,10 @@ const REQUIRED_IDS = [
   'back-from-admin-footer-btn',
   'month-select',
   'timbraBtn',
+  'geo-autopunch-toggle',
+  'geofence-map',
+  'geofence-save-btn',
+  'geofence-clear-btn',
 ];
 
 for (const id of REQUIRED_IDS) {
@@ -91,4 +95,21 @@ test('manifest.webmanifest è JSON valido con i campi PWA minimi', () => {
 test('sw.js non intercetta mai richieste cross-origin (Supabase/CDN)', () => {
   const sw = readFileSync(join(root, 'sw.js'), 'utf8');
   assert.match(sw, /url\.origin\s*!==\s*self\.location\.origin/);
+});
+
+test('index.html carica Leaflet e Leaflet.draw (mappa area geofence)', () => {
+  assert.match(html, /leaflet@1\.9\.4\/dist\/leaflet\.js/);
+  assert.match(html, /leaflet-draw@1\.0\.4\/dist\/leaflet\.draw\.js/);
+});
+
+test('index.html importa le funzioni geofence da js/utils.js', () => {
+  assert.match(html, /isInsideGeofence/);
+  assert.match(html, /hasUsableGeofence/);
+});
+
+test('la timbratura automatica per posizione tocca solo il campo di ingresso mattutino', () => {
+  const js = extractInlineModuleScript();
+  assert.match(js, /async function attemptAutoMorningPunch/);
+  // Deve derivare il campo da punchSteps[0] (iniziomattina), mai un altro passo.
+  assert.match(js, /punchSteps\[0\]\.field/);
 });

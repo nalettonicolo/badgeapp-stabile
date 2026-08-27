@@ -56,8 +56,13 @@ Database Supabase (obbligatorio per app web + mobile)
 --------------------------------------------------
 Nota privacy posizione
 --------------------------------------------------
-La geolocalizzazione e la geotimbratura automatica sono state rimosse dall'app.
-Restano disponibili login, timbratura standard, timbratura manuale, richieste, storico e pannello admin.
+La geolocalizzazione è opt-in: nessun dipendente viene tracciato di default.
+Chi attiva l'interruttore "Timbra automaticamente l'ingresso mattutino" nella
+propria vista timbrature autorizza il browser a leggere la posizione SOLO
+mentre quella pagina è aperta (nessun tracciamento in background, nessuna
+posizione salvata sul server — solo un confronto locale, sul dispositivo, con
+l'area configurata dall'admin) e SOLO per registrare l'ingresso mattutino
+quando manca. L'area (poligono) è configurabile dal pannello admin.
 
 --------------------------------------------------
 Workaround standby Supabase (Free)
