@@ -67,7 +67,7 @@ quando manca. L'area (poligono) è configurabile dal pannello admin.
 --------------------------------------------------
 Workaround standby Supabase (Free)
 --------------------------------------------------
-Workflow già pronto nel repository:
+Workflow già pronto nel repository (gira automaticamente ogni 2 giorni):
 - .github/workflows/supabase-keepalive.yml
 
 Configura questi GitHub Secrets in repo > Settings > Secrets and variables > Actions:

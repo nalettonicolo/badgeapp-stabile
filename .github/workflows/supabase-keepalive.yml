@@ -8,7 +8,10 @@ name: Supabase Keepalive
 
 on:
   schedule:
-    - cron: "0 6 */6 * *"
+    # Ogni 2 giorni: Supabase mette in pausa un progetto Free dopo 7 giorni
+    # senza attività sul DB. Un margine di 2 giorni (invece di ridosso a 7)
+    # assorbe un run saltato/fallito senza rischiare la pausa.
+    - cron: "0 6 */2 * *"
   workflow_dispatch:
 
 jobs:
