@@ -14,6 +14,17 @@ che l'agente non ha. Vanno fatti a mano dal proprietario del progetto.
   di sicurezza Supabase). Abilitarla blocca le password compromesse note
   (controllo contro HaveIBeenPwned). Stesso pannello di cui sopra.
 
+## Supabase → Account → Access Tokens
+
+- [ ] **SUPABASE_ACCESS_TOKEN per la riattivazione automatica del keepalive**:
+  `.github/workflows/supabase-keepalive.yml` ora prova a riattivare da solo
+  il progetto se lo trova in pausa, ma serve un Personal Access Token
+  Supabase come secret GitHub (`SUPABASE_ACCESS_TOKEN`) — l'agente non può
+  generarlo (richiede login alla dashboard). Istruzioni passo-passo in
+  `.github/GITHUB_SECRETS.md`. Senza questo secret il workflow resta solo
+  un ping preventivo: se il progetto va comunque in pausa, va riattivato a
+  mano dalla dashboard.
+
 ## Branding / design (decisione di prodotto, non tecnica)
 
 - [ ] **Icona PWA/favicon** (`icons/*.png`, Fase 5): generata come placeholder

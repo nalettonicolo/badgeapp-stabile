@@ -71,11 +71,18 @@ Workflow già pronto nel repository (gira automaticamente ogni 2 giorni):
 - .github/workflows/supabase-keepalive.yml
 
 Configura questi GitHub Secrets in repo > Settings > Secrets and variables > Actions:
-- SUPABASE_URL (es. https://xxxx.supabase.co)
-- SUPABASE_ANON_KEY
+- SUPABASE_URL (es. https://xxxx.supabase.co) — opzionale
+- SUPABASE_ANON_KEY — opzionale
+- SUPABASE_ACCESS_TOKEN — opzionale, ma senza questo il workflow può solo
+  segnalare che il progetto è in pausa, non riattivarlo da solo (vedi sotto)
 
 Poi avvia un test manuale:
 - Actions > Supabase Keepalive > Run workflow
 
 Nota:
 - È un workaround, non una garanzia "always on" del free tier.
+- Il ping da solo previene la pausa ma non può risvegliare un progetto già
+  pausato (serve la Management API di Supabase, non la REST API del DB).
+  Con il secret SUPABASE_ACCESS_TOKEN (Personal Access Token, vedi
+  .github/GITHUB_SECRETS.md per come generarlo) il workflow prova anche a
+  riattivarlo automaticamente quando lo trova in pausa.
