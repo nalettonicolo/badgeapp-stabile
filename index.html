@@ -4,407 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Timbrature Online</title>
-    <style>
-        /* ------------------------------------------------
-         * 1. Stili Base e Globali
-         * ------------------------------------------------ */
-        .hidden { display: none !important;
-        }
-        
-        body {
-            background-color: #f3f4f6;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            min-height: 100vh;
-            padding: 16px 8px;
-            font-family: sans-serif;
-            margin: 0;
-            line-height: 1.5;
-        }
-
-        /* Input/Button Resets */
-        input:read-only { background-color: #e5e7eb;
-            cursor: default; border: 1px solid #ccc; padding: 8px; border-radius: 4px;
-        }
-        input[type="email"], input[type="password"], input[type="text"], input[type="time"], input[type="date"], select { 
-            border: 1px solid #ccc;
-            padding: 10px; border-radius: 6px; width: 100%; box-sizing: border-box; 
-        }
-        button { border: none;
-            cursor: pointer; transition: background-color 0.2s; padding: 10px; border-radius: 6px; font-weight: 600;}
-        button:hover:not(:disabled) { opacity: 0.9;
-        }
-        button:disabled { background-color: #9ca3af !important; cursor: not-allowed;
-        }
-
-        /* Viste Principali */
-        #login-view, #punch-view, #history-view, #admin-view { 
-            background-color: white;
-            padding: 16px; 
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 12px; 
-            width: 100%; max-width: 100%; 
-            margin: 8px 0;
-        }
-        #login-view { max-width: 400px;
-        }
-        
-        /* Bottone Admin Fisso */
-        #fixed-admin-btn {
-            position: fixed;
-            bottom: 15px; right: 15px; 
-            background-color: #4f46e5; color: white; padding: 10px 15px; 
-            border-radius: 9999px; font-size: 0.9rem; z-index: 60;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Modal */
-        .modal {
-            position: fixed;
-            inset: 0; background-color: rgba(0, 0, 0, 0.5); 
-            display: flex; align-items: center; justify-content: center; z-index: 70;
-            padding: 10px;
-        }
-        .modal-content {
-            background-color: white;
-            padding: 20px; border-radius: 10px; 
-            max-width: 95%; width: 400px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        }
-
-        /* ------------------------------------------------
-         * 2. Stili Specifici Viste (Mobile Layout)
-         * ------------------------------------------------ */
-
-        /* Header Viste (Punch e Admin) */
-        .view-header {
-            display: flex;
-            justify-content: space-between; align-items: center; 
-            border-bottom: 1px solid #e5e7eb; padding-bottom: 1rem; margin-bottom: 1rem; 
-            flex-direction: column; 
-            flex-wrap: wrap;
-            gap: 10px; 
-            text-align: center;
-        }
-        .view-header h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 5px;
-        }
-        .view-header p { font-size: 0.875rem; color: #6b7280;
-        }
-        .view-controls { display: flex; gap: 10px; width: 100%; justify-content: center;
-        }
-        .view-controls button { flex: 1; max-width: 150px;
-        }
-
-
-        /* Punch View - Timbrature Odierne */
-        .punch-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-        .punch-row {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .punch-row label {
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        /* Sezione Pausa */
-        .break-section {
-            border-top: 1px solid #d1d5db;
-            padding-top: 1rem; margin-top: 1rem;
-        }
-        .break-row {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .break-row label {
-             font-weight: 700;
-        }
-
-        /* Bottoni Timbratura */
-        .punch-buttons {
-            display: flex;
-            gap: 10px; margin-top: 1.5rem;
-            flex-direction: column;
-        }
-        .punch-buttons button { flex: 1;
-            padding: 12px; }
-
-        .absence-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 0.75rem;
-            flex-direction: column;
-        }
-        .absence-buttons button { flex: 1;
-            padding: 11px;
-            min-width: 0;
-        }
-
-        /* Admin View - Form */
-        #admin-view .form-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 20px; 
-            margin-bottom: 20px;
-        }
-        #admin-view .form-section {
-            border: 1px solid #d1d5db;
-            border-radius: 8px; padding: 15px;
-        }
-        #add-employee-form, #reset-password-form {
-             display: flex;
-            flex-direction: column; gap: 15px;
-        }
-        #profiles-ul {
-            list-style: none;
-            padding: 0;
-        }
-        #profiles-ul li {
-            padding: 10px 0;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        /* Stile per l'UID cliccabile */
-        .clickable-uid {
-            cursor: pointer;
-            color: #4f46e5;
-            text-decoration: underline;
-            font-weight: 700 !important;
-        }
-
-
-        /* Storico View - Tabella */
-        #punches-table-container {
-            overflow-x: auto;
-        }
-        #history-view table {
-            min-width: 700px;
-            width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.85rem;
-        }
-        #history-view th, #history-view td {
-            padding: 8px 5px;
-            border: 1px solid #d1d5db; text-align: center;
-        }
-
-        /* Riepilogo Mensile */
-        #monthly-summary {
-            margin-top: 20px;
-            padding: 15px; border: 2px solid #3b82f6; border-radius: 10px; background-color: #eff6ff;
-        }
-        #monthly-summary h3 { font-size: 1.25rem; margin-bottom: 10px;
-        }
-        
-        /* Periodo storico (sempre visibile) + riga admin opzionale */
-        #history-month-controls {
-            margin-bottom: 15px;
-            padding: 12px 14px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-        }
-        #history-month-controls label {
-            font-weight: 600;
-            display: block;
-            margin-bottom: 8px;
-            color: #334155;
-        }
-        #history-month-controls select {
-            max-width: 100%;
-            font-size: 1rem;
-        }
-        #admin-history-controls {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            margin-bottom: 12px;
-            min-height: 0;
-        }
-        #admin-history-controls.hidden {
-            display: none;
-        }
-
-        /* Pulsante fisso in basso: torna alle timbrature (sempre visibile sullo scroll) */
-        .nav-footer-timbrature {
-            position: sticky;
-            bottom: 0;
-            z-index: 15;
-            margin-top: 20px;
-            padding: 14px 0 8px;
-            background: linear-gradient(to top, #ffffff 70%, rgba(255, 255, 255, 0));
-        }
-        .btn-timbrature {
-            width: 100%;
-            max-width: 420px;
-            margin: 0 auto;
-            display: block;
-            background-color: #4b5563;
-            color: white;
-            padding: 12px 16px;
-            border-radius: 10px;
-            font-weight: 600;
-            border: none;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-        }
-        .btn-timbrature:hover {
-            opacity: 0.92;
-        }
-
-        /* ------------------------------------------------
-         * 3. Media Query (Layout Desktop/Tablet)
-         * ------------------------------------------------ */
-
-        @media (min-width: 768px) {
-            body { justify-content: center;
-            padding: 16px; }
-            #punch-view, #history-view, #admin-view { max-width: 1024px;
-            }
-            
-            /* Header Viste */
-            .view-header { flex-direction: row;
-            text-align: left; }
-            .view-controls { width: auto; justify-content: flex-end;
-            }
-            
-            /* Punch View - Timbrature Odierne (Griglia 1:1) */
-            .punch-grid {
-                flex-direction: column;
-                gap: 1rem;
-            }
-            .punch-row {
-                display: grid;
-                grid-template-columns: 1fr 1fr; 
-                gap: 16px; 
-                align-items: center;
-            }
-            .break-row {
-                display: grid;
-                grid-template-columns: 1fr 1fr; 
-                gap: 16px; 
-                align-items: center;
-            }
-
-            /* Bottoni Timbratura */
-            .punch-buttons { flex-direction: row;
-            }
-
-            .absence-buttons { flex-direction: row;
-                flex-wrap: wrap;
-            }
-
-            /* Admin View - Form (Griglia 1:1) */
-            #admin-view .form-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr; 
-                gap: 30px; 
-            }
-        }
-
-        /* Finitura visuale: tono più professionale senza cambiare il markup operativo. */
-        :root {
-            --brand: #1d4ed8;
-            --brand-dark: #1e3a8a;
-            --ink: #0f172a;
-            --muted: #64748b;
-            --line: #e2e8f0;
-            --panel: rgba(255, 255, 255, 0.94);
-        }
-        * { box-sizing: border-box; }
-        body {
-            color: var(--ink);
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background:
-                radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 32rem),
-                linear-gradient(135deg, #eef2ff 0%, #f8fafc 45%, #ecfeff 100%);
-        }
-        #login-view,
-        #punch-view,
-        #history-view,
-        #admin-view {
-            border: 1px solid rgba(226, 232, 240, 0.9);
-            border-radius: 24px;
-            background: var(--panel);
-            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
-            backdrop-filter: blur(14px);
-        }
-        #login-view h1,
-        .view-header h2 {
-            color: var(--ink) !important;
-            letter-spacing: -0.03em;
-        }
-        .view-header {
-            align-items: flex-start;
-            border-bottom-color: var(--line);
-        }
-        .view-header p,
-        #monthly-summary p,
-        #employee-requests-list,
-        .form-section p {
-            color: var(--muted) !important;
-        }
-        input,
-        select {
-            border-color: var(--line) !important;
-            border-radius: 12px !important;
-            background: #f8fafc;
-            color: var(--ink);
-            outline: none;
-        }
-        input:focus,
-        select:focus {
-            border-color: #93c5fd !important;
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
-        }
-        button {
-            border-radius: 12px !important;
-            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.10);
-        }
-        button:focus-visible {
-            outline: 3px solid rgba(37, 99, 235, 0.25);
-            outline-offset: 2px;
-        }
-        #timbraBtn,
-        #login-form button[type="submit"] {
-            background: linear-gradient(135deg, var(--brand), var(--brand-dark)) !important;
-        }
-        .form-section,
-        #monthly-summary,
-        #history-month-controls,
-        #punches-table-container,
-        #employee-requests-list {
-            border-color: var(--line) !important;
-            border-radius: 18px !important;
-            background: rgba(248, 250, 252, 0.78) !important;
-        }
-        #history-view table {
-            border-collapse: separate;
-            border-spacing: 0;
-            overflow: hidden;
-            border-radius: 16px;
-            background: #ffffff;
-        }
-        #history-view th {
-            background: #eff6ff;
-            color: #1e3a8a;
-        }
-        #history-view td,
-        #history-view th {
-            border-color: #e5e7eb;
-        }
-        .clickable-uid {
-            color: var(--brand);
-            text-decoration: none;
-        }
-        .nav-footer-timbrature {
-            background: linear-gradient(to top, rgba(255, 255, 255, 0.96) 70%, rgba(255, 255, 255, 0));
-        }
-    </style>
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="description" content="Timbratura, storico ore e richieste (trasferta, malattia, ferie) per i dipendenti." />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <!-- Mappa per l'area di timbratura automatica (solo pannello admin) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 </head>
 <body>
 
@@ -443,9 +51,9 @@
             </p>
             <form id="recovery-password-form" style="display: flex; flex-direction: column; gap: 12px;">
                 <label for="recovery-password-input" style="font-weight: 600;">Nuova password (min. 6 caratteri)</label>
-                <input type="password" id="recovery-password-input" required minlength="6" autocomplete="new-password" />
+                <input type="password" id="recovery-password-input" required minlength="10" autocomplete="new-password" />
                 <label for="recovery-password-confirm" style="font-weight: 600;">Ripeti password</label>
-                <input type="password" id="recovery-password-confirm" required minlength="6" autocomplete="new-password" />
+                <input type="password" id="recovery-password-confirm" required minlength="10" autocomplete="new-password" />
                 <div style="display: flex; gap: 10px; margin-top: 8px;">
                     <button type="submit" style="flex: 1; background-color: #2563eb; color: white; padding: 10px;">Salva e continua</button>
                     <button type="button" id="recovery-cancel-btn" style="flex: 1; background-color: #6b7280; color: white; padding: 10px;">Annulla</button>
@@ -542,6 +150,17 @@
                     <button type="button" id="req-ferie-btn" style="background-color: #0d9488; color: white;">Ferie</button>
                 </div>
             </div>
+            <div id="geo-autopunch-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="geo-autopunch-toggle" style="width: auto;" />
+                    <label for="geo-autopunch-toggle" style="font-weight: 600; font-size: 0.9rem; color: #374151;">Timbra automaticamente l'ingresso mattutino quando entro in sede</label>
+                </div>
+                <p style="font-size: 0.78rem; color: #6b7280; margin: 0.35rem 0 0 26px; line-height: 1.4;">
+                    Richiede il permesso di localizzazione del browser e funziona solo con questa pagina aperta (non ad app chiusa).
+                    Timbra solo l'ingresso mattutino, una volta al giorno, e solo se l'amministratore ha configurato un'area.
+                </p>
+                <p id="geo-autopunch-status" style="font-size: 0.78rem; color: #6b7280; margin: 0.35rem 0 0 26px;"></p>
+            </div>
             <p id="timbra-message" style="text-align: center;
                 margin-top: 0.5rem; font-size: 0.875rem; color: #4b5563; min-height: 1.25rem;"></p>
         </div>
@@ -553,7 +172,7 @@
                 <h2 style="color: #1f2937;"><span id="history-title-prefix">Storico Timbrature</span> <span id="history-user-display" style="font-weight: 700;
                     /* Rimosso colore blu */
                     color: inherit;"></span></h2>
-                <button id="add-punch-btn" style="background-color: #2563eb; color: white; padding: 6px 10px; border-radius: 6px; font-weight: 600; font-size: 1.1rem; line-height: 1;">
+                <button id="add-punch-btn" aria-label="Inserisci timbratura mancante" style="background-color: #2563eb; color: white; padding: 6px 10px; border-radius: 6px; font-weight: 600; font-size: 1.1rem; line-height: 1;">
                     +
                 </button>
             </div>
@@ -570,7 +189,6 @@
             <p id="current-admin-name" style="font-weight: 600;
                 color: #3b82f6; margin: 0;"></p>
         </div>
-
 
         <div id="punches-table-container">
             <p style="text-align: center;
@@ -607,7 +225,7 @@
                     <input type="text" id="new-employee-last-name" placeholder="Cognome" required />
                     <input type="email" id="new-employee-email" placeholder="Email (username)" required 
                         />
-                    <input type="password" id="new-employee-password" placeholder="Password (min 6 car.)" required minlength="6" />
+                    <input type="password" id="new-employee-password" placeholder="Password (min 10 car.)" required minlength="10" />
                     
                     <div style="display: flex;
                         align-items: center; gap: 10px;">
@@ -628,11 +246,39 @@
                     <p style="font-size: 0.875rem;
                         color: #6b7280;">Invia email di reset reale. Inserisci UID o email del dipendente.</p>
                     <input type="text" id="reset-user-id" placeholder="ID Utente o Email dipendente" required />
-                    <input type="password" id="reset-new-password" placeholder="Nuova Password (min 6 car.)" required minlength="6" />
+                    <input type="password" id="reset-new-password" placeholder="Nuova Password (min 10 car.)" required minlength="10" />
                     <button type="submit" style="background-color: #f97316;
                         color: white;">Invia Email Reset Password</button>
                 </form>
             </div>
+        </div>
+
+        <div style="border: 1px solid #d1d5db; border-radius: 12px; padding: 20px; background-color: #f9fafb; margin-bottom: 20px;">
+            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #7c3aed;">Area timbratura automatica (posizione)</h3>
+            <p style="font-size: 0.85rem; color: #6b7280; margin: 0 0 10px 0; line-height: 1.4;">
+                Disegna l'area (es. il perimetro della sede): un dipendente con la timbratura automatica attiva e l'ingresso mattutino non ancora registrato lo vedrà timbrato da solo entrandovi.
+                Cerca un indirizzo per centrare la mappa, poi usa lo strumento poligono (icona a sinistra sulla mappa) per disegnarla e premi «Salva area».
+            </p>
+            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                <input type="text" id="geofence-address-search" placeholder="Cerca un indirizzo per centrare la mappa…" style="flex: 1;" />
+                <button type="button" id="geofence-address-search-btn" style="background-color: #6366f1; color: white; white-space: nowrap;">Cerca</button>
+            </div>
+            <div id="geofence-map" style="height: 360px; border-radius: 8px; border: 1px solid #d1d5db;"></div>
+            <div style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: center;">
+                <button type="button" id="geofence-save-btn" style="background-color: #7c3aed; color: white;">Salva area</button>
+                <button type="button" id="geofence-clear-btn" style="background-color: #6b7280; color: white;">Rimuovi area</button>
+                <span id="geofence-status" style="font-size: 0.85rem; color: #6b7280;"></span>
+            </div>
+        </div>
+
+        <div style="border: 1px solid #d1d5db; border-radius: 12px; padding: 20px; background-color: #f9fafb; margin-bottom: 20px;">
+            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #0891b2;">Richieste da approvare</h3>
+            <p style="font-size: 0.85rem; color: #6b7280; margin: 0 0 10px 0;">
+                Malattia, trasferta e ferie inviate dai dipendenti. Approva o rifiuta: lo stato si aggiorna anche nello storico timbrature del dipendente e nella sua lista «Ultime richieste».
+            </p>
+            <ul id="pending-requests-ul">
+                <li style="color: #6b7280;">Caricamento...</li>
+            </ul>
         </div>
 
         <div style="border: 1px solid #d1d5db;
@@ -759,8 +405,49 @@
         </div>
     </div>
 
+    <!-- Mappa per l'area di timbratura automatica (solo pannello admin) -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
     <script type="module">
+        import {
+            isLikelyNetworkError,
+            getLocalDateString,
+            getTodayDateString,
+            isRlsPolicyError,
+            normalizeTimeForInput,
+            timeToMinutes,
+            analyzePunchNonConformity,
+            minutesToHHMM,
+            calculateWorkMinutes,
+            inclusiveCalendarDays,
+            overlapDaysInMonthRange,
+            isInsideGeofence,
+            hasUsableGeofence,
+            enumerateDatesInRange,
+            countBusinessDays,
+        } from './js/utils.js';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        // Rete di sicurezza globale: prima di questa modifica un errore non
+        // intercettato da un try/catch spariva nel nulla (solo in console,
+        // se aperta) e l'utente restava davanti a un'app apparentemente
+        // bloccata senza alcun messaggio. showMessage() è definita più
+        // avanti in questo stesso script: le dichiarazioni "function" sono
+        // hoisted, quindi al momento in cui questi listener scattano
+        // (sempre in modo asincrono) è già disponibile.
+        window.addEventListener('error', (event) => {
+            console.error('Errore non gestito:', event.error || event.message);
+            if (typeof showMessage === 'function') {
+                showMessage('Si è verificato un errore imprevisto. Riprova o ricarica la pagina.', true);
+            }
+        });
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Promise non gestita:', event.reason);
+            if (typeof showMessage === 'function') {
+                showMessage('Si è verificato un errore imprevisto. Riprova o ricarica la pagina.', true);
+            }
+        });
 
         const cfg = typeof window !== "undefined" ? window.__BADGEAPP_SUPABASE__ : null;
         const DEFAULT_SUPABASE_URL = "https://pobrjdrqpzerjlcqnpra.supabase.co";
@@ -811,7 +498,8 @@
         // Elementi DOM (CONTROLS & INFO)
         const userNameEl = document.getElementById("user-name");
         const userEmailEl = document.getElementById("user-email");
-        const profilesUl = document.getElementById("profiles-ul"); 
+        const profilesUl = document.getElementById("profiles-ul");
+        const pendingRequestsUl = document.getElementById("pending-requests-ul");
         const timbraBtn = document.getElementById("timbraBtn");
         const timbraMessageEl = document.getElementById("timbra-message");
         const historyBtn = document.getElementById("history-btn");
@@ -828,6 +516,16 @@
         const backFromAdminBtn = document.getElementById("back-from-admin-btn");
         const backFromHistoryFooterBtn = document.getElementById("back-from-history-footer-btn");
         const backFromAdminFooterBtn = document.getElementById("back-from-admin-footer-btn");
+
+        // Timbratura automatica per posizione DOM
+        const geoAutoPunchToggle = document.getElementById("geo-autopunch-toggle");
+        const geoAutoPunchStatusEl = document.getElementById("geo-autopunch-status");
+        const geofenceMapEl = document.getElementById("geofence-map");
+        const geofenceAddressSearchInput = document.getElementById("geofence-address-search");
+        const geofenceAddressSearchBtn = document.getElementById("geofence-address-search-btn");
+        const geofenceSaveBtn = document.getElementById("geofence-save-btn");
+        const geofenceClearBtn = document.getElementById("geofence-clear-btn");
+        const geofenceStatusEl = document.getElementById("geofence-status");
 
         // Timbratura Manuale DOM
         const manualPunchModal = document.getElementById("manual-punch-modal");
@@ -909,7 +607,16 @@
         let monthSelectDebounce = null;
         let currentHistoryUserId = null;
         let autoPunchInProgress = false;
-        const allViews = [loginView, punchView, historyView, adminView]; 
+        const allViews = [loginView, punchView, historyView, adminView];
+
+        // Timbratura automatica per posizione (solo ingresso mattutino, opt-in)
+        const GEO_AUTOPUNCH_STORAGE_KEY = "badgeapp-geo-autopunch-enabled-v1";
+        let geofenceSettingsCache = null;
+        let geoWatchId = null;
+        let wasInsideGeofence = null;
+        // Mappa admin per disegnare l'area (inizializzata solo quando si apre il pannello)
+        let geofenceMap = null;
+        let geofenceDrawnItems = null;
 
         // Mappa gli stati con i nomi dei campi
         const punchSteps = [
@@ -932,31 +639,6 @@
             setTimeout(() => {
                 messageBox.remove();
             }, 3000);
-        }
-
-        /** Errore di rete / fetch (non RLS): messaggio utente diverso da policy DB */
-        function isLikelyNetworkError(err) {
-            const m = String(err?.message ?? err ?? "");
-            const low = m.toLowerCase();
-            return (
-                low.includes("failed to fetch") ||
-                low.includes("networkerror") ||
-                low.includes("network request failed") ||
-                low.includes("load failed") ||
-                low.includes("aborted") ||
-                low.includes("timeout")
-            );
-        }
-
-        function getLocalDateString(date = new Date()) {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, "0");
-            const day = String(date.getDate()).padStart(2, "0");
-            return `${year}-${month}-${day}`;
-        }
-
-        function getTodayDateString() {
-            return getLocalDateString();
         }
 
         function showView(viewToShow) {
@@ -992,6 +674,7 @@
                 loadPunchesHistory(userId, monthSelect.value, userName);
             } else if (!adminView.classList.contains("hidden") && isAdmin) {
                 loadAllProfiles();
+                loadPendingRequests();
             }
         }
 
@@ -1012,6 +695,8 @@
             if (v === "admin-view" && isAdmin) {
                 showView(adminView);
                 loadAllProfiles();
+                loadPendingRequests();
+                initGeofenceMapIfNeeded();
                 return;
             }
             showView(punchView);
@@ -1067,12 +752,6 @@
             return lastError;
         }
 
-        function isRlsPolicyError(error) {
-            if (!error) return false;
-            const text = `${error.message || ""} ${error.details || ""} ${error.hint || ""}`.toLowerCase();
-            return text.includes("row-level security") || text.includes("new row violates");
-        }
-
         async function runSinglePunch() {
             if (!currentUser || nextPunchIndex >= punchSteps.length || autoPunchInProgress) return;
 
@@ -1094,41 +773,299 @@
             await loadPunches();
         }
 
+        // ------------------------------------------------
+        // 🔹 Timbratura automatica per posizione (solo ingresso mattutino, opt-in)
+        // ------------------------------------------------
+
+        function isGeoAutoPunchEnabled() {
+            try {
+                return localStorage.getItem(GEO_AUTOPUNCH_STORAGE_KEY) === "1";
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function persistGeoAutoPunchEnabled(enabled) {
+            try {
+                if (enabled) localStorage.setItem(GEO_AUTOPUNCH_STORAGE_KEY, "1");
+                else localStorage.removeItem(GEO_AUTOPUNCH_STORAGE_KEY);
+            } catch (_) { /* storage non disponibile: il toggle resta solo per questa sessione */ }
+        }
+
+        /** Ricarica sempre da Supabase (la cache viene invalidata dall'admin al salvataggio/rimozione area). */
+        async function loadGeofenceSettings() {
+            const { data, error } = await supabase
+                .from("geofence_settings")
+                .select("polygon_path, center_lat, center_lng, radius_entry_meters, max_accuracy_meters, updated_at")
+                .eq("id", 1)
+                .maybeSingle();
+            if (error) {
+                console.warn("Impossibile caricare l'area di timbratura automatica:", error);
+                geofenceSettingsCache = null;
+                return null;
+            }
+            geofenceSettingsCache = data;
+            return data;
+        }
+
+        function stopGeoAutoPunchWatch() {
+            if (geoWatchId != null && "geolocation" in navigator) {
+                navigator.geolocation.clearWatch(geoWatchId);
+            }
+            geoWatchId = null;
+            wasInsideGeofence = null;
+        }
+
+        /**
+         * Verifica (con una query fresca, non con lo stato di UI eventualmente non
+         * aggiornato) se manca ancora l'ingresso mattutino di oggi, e in tal caso lo
+         * timbra. Disaccoppiato da quale vista è aperta al momento: il rilevamento
+         * della posizione deve funzionare anche se il dipendente è sullo storico.
+         */
+        async function attemptAutoMorningPunch() {
+            if (!currentUser || autoPunchInProgress) return;
+            const morningField = punchSteps[0].field; // "iniziomattina"
+            const today = getTodayDateString();
+
+            const { data, error } = await supabase
+                .from("daily_punches")
+                .select(morningField)
+                .eq("user_id", currentUser.id)
+                .eq("punch_date", today)
+                .maybeSingle();
+            if (error) {
+                console.warn("Timbratura automatica: verifica stato odierno fallita, riprovo al prossimo rilevamento.", error);
+                return;
+            }
+            if (data && data[morningField]) return; // già timbrato oggi, non fare nulla
+
+            autoPunchInProgress = true;
+            const nowTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
+            const { error: upsertError } = await upsertPunch(today, morningField, nowTime);
+            autoPunchInProgress = false;
+
+            if (upsertError) {
+                console.error("Timbratura automatica per posizione fallita:", upsertError);
+                showMessage("Timbratura automatica per posizione non riuscita. Puoi timbrare manualmente.", true);
+                return;
+            }
+            showMessage(`Timbratura automatica: ingresso registrato per posizione (${nowTime}).`);
+            if (!punchView.classList.contains("hidden")) {
+                loadPunches();
+            }
+        }
+
+        async function startGeoAutoPunchWatch() {
+            if (!("geolocation" in navigator)) {
+                showMessage("Questo browser non supporta la geolocalizzazione.", true);
+                return false;
+            }
+            const settings = geofenceSettingsCache || await loadGeofenceSettings();
+            if (!hasUsableGeofence(settings)) {
+                if (geoAutoPunchStatusEl) {
+                    geoAutoPunchStatusEl.textContent = "Nessuna area configurata dall'amministratore: la timbratura automatica resta inattiva.";
+                }
+                return false;
+            }
+            stopGeoAutoPunchWatch();
+            geoWatchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const { latitude, longitude, accuracy } = pos.coords;
+                    const maxAcc = Number.isFinite(settings.max_accuracy_meters) ? settings.max_accuracy_meters : 60;
+                    if (Number.isFinite(accuracy) && accuracy > maxAcc) return; // lettura troppo imprecisa: ignorata, niente cambio di stato
+                    const insideNow = isInsideGeofence(latitude, longitude, settings);
+                    if (wasInsideGeofence === false && insideNow === true) {
+                        attemptAutoMorningPunch();
+                    }
+                    wasInsideGeofence = insideNow;
+                    if (geoAutoPunchStatusEl) {
+                        geoAutoPunchStatusEl.textContent = insideNow
+                            ? "Sei nell'area: se manca l'ingresso mattutino verrà timbrato a breve."
+                            : "Attiva — in attesa che tu entri nell'area.";
+                    }
+                },
+                (err) => {
+                    console.warn("Geolocalizzazione non disponibile:", err);
+                    if (geoAutoPunchStatusEl) {
+                        geoAutoPunchStatusEl.textContent = "Posizione non disponibile (permesso negato o GPS spento): timbratura automatica sospesa.";
+                    }
+                    setGeoAutoPunchEnabled(false);
+                },
+                { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+            );
+            if (geoAutoPunchStatusEl) {
+                geoAutoPunchStatusEl.textContent = "Attiva — in attesa che tu entri nell'area.";
+            }
+            return true;
+        }
+
+        function setGeoAutoPunchEnabled(enabled) {
+            persistGeoAutoPunchEnabled(enabled);
+            if (geoAutoPunchToggle) geoAutoPunchToggle.checked = enabled;
+            if (enabled) {
+                startGeoAutoPunchWatch();
+            } else {
+                stopGeoAutoPunchWatch();
+                if (geoAutoPunchStatusEl) geoAutoPunchStatusEl.textContent = "";
+            }
+        }
+
+        /** Da chiamare dopo il login: riattiva silenziosamente il watch se l'utente lo aveva già acceso su questo dispositivo. */
+        function initGeoAutoPunchIfEnabled() {
+            if (geoAutoPunchToggle) geoAutoPunchToggle.checked = isGeoAutoPunchEnabled();
+            if (isGeoAutoPunchEnabled()) {
+                startGeoAutoPunchWatch();
+            }
+        }
+
+        if (geoAutoPunchToggle) {
+            geoAutoPunchToggle.addEventListener("change", (e) => {
+                setGeoAutoPunchEnabled(e.target.checked);
+            });
+        }
+
+        // ------------------------------------------------
+        // 🔹 Pannello admin: disegno dell'area sulla mappa (Leaflet + Leaflet.draw)
+        // ------------------------------------------------
+
+        /** Inizializza la mappa una sola volta; sulle visite successive al pannello admin la fa solo ridimensionare. */
+        function initGeofenceMapIfNeeded() {
+            if (geofenceMap) {
+                geofenceMap.invalidateSize();
+                return;
+            }
+            if (typeof L === "undefined" || !geofenceMapEl) return; // libreria non caricata (offline?): sezione inattiva
+
+            geofenceMap = L.map(geofenceMapEl).setView([41.9028, 12.4964], 6); // Italia, poi ricentrata sull'area salvata
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 19,
+            }).addTo(geofenceMap);
+
+            geofenceDrawnItems = new L.FeatureGroup();
+            geofenceMap.addLayer(geofenceDrawnItems);
+
+            const drawControl = new L.Control.Draw({
+                draw: {
+                    polygon: { allowIntersection: false, showArea: true },
+                    marker: false,
+                    circle: false,
+                    circlemarker: false,
+                    rectangle: false,
+                    polyline: false,
+                },
+                edit: { featureGroup: geofenceDrawnItems, remove: true },
+            });
+            geofenceMap.addControl(drawControl);
+
+            // Una sola area alla volta: un nuovo disegno sostituisce il precedente.
+            geofenceMap.on(L.Draw.Event.CREATED, (e) => {
+                geofenceDrawnItems.clearLayers();
+                geofenceDrawnItems.addLayer(e.layer);
+            });
+
+            loadGeofenceIntoMap();
+        }
+
+        async function loadGeofenceIntoMap() {
+            const settings = await loadGeofenceSettings();
+            if (!geofenceDrawnItems) return;
+            geofenceDrawnItems.clearLayers();
+            if (settings && Array.isArray(settings.polygon_path) && settings.polygon_path.length >= 3) {
+                const latlngs = settings.polygon_path.map((p) => [p.lat, p.lng]);
+                const polygon = L.polygon(latlngs);
+                geofenceDrawnItems.addLayer(polygon);
+                geofenceMap.fitBounds(polygon.getBounds(), { maxZoom: 17 });
+                if (geofenceStatusEl) {
+                    const when = settings.updated_at ? new Date(settings.updated_at).toLocaleString('it-IT') : '';
+                    geofenceStatusEl.textContent = `Area attiva${when ? ` (salvata ${when})` : ''}.`;
+                }
+            } else if (geofenceStatusEl) {
+                geofenceStatusEl.textContent = "Nessuna area configurata.";
+            }
+        }
+
+        if (geofenceAddressSearchBtn) {
+            geofenceAddressSearchBtn.addEventListener("click", async () => {
+                const q = geofenceAddressSearchInput ? geofenceAddressSearchInput.value.trim() : "";
+                if (!q || !geofenceMap) return;
+                try {
+                    const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`);
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const results = await resp.json();
+                    if (!results || results.length === 0) {
+                        showMessage("Indirizzo non trovato.", true);
+                        return;
+                    }
+                    const { lat, lon } = results[0];
+                    geofenceMap.setView([parseFloat(lat), parseFloat(lon)], 17);
+                } catch (err) {
+                    console.error("Ricerca indirizzo (Nominatim):", err);
+                    showMessage(isLikelyNetworkError(err) ? "Connessione assente. Riprova tra poco." : "Ricerca indirizzo non riuscita.", true);
+                }
+            });
+        }
+
+        if (geofenceSaveBtn) {
+            geofenceSaveBtn.addEventListener("click", async () => {
+                if (!geofenceDrawnItems) return;
+                const layers = geofenceDrawnItems.getLayers();
+                if (layers.length === 0) {
+                    showMessage("Disegna prima un'area sulla mappa (icona poligono in alto a sinistra).", true);
+                    return;
+                }
+                const latlngs = layers[0].getLatLngs()[0]; // poligono semplice: primo (e unico) anello
+                if (!latlngs || latlngs.length < 3) {
+                    showMessage("Il poligono disegnato non è valido: servono almeno 3 punti.", true);
+                    return;
+                }
+                const polygonPath = latlngs.map((p) => ({ lat: p.lat, lng: p.lng }));
+                const centroid = polygonPath.reduce(
+                    (acc, p) => ({ lat: acc.lat + p.lat / polygonPath.length, lng: acc.lng + p.lng / polygonPath.length }),
+                    { lat: 0, lng: 0 }
+                );
+
+                const { error } = await supabase.from("geofence_settings").upsert({
+                    id: 1,
+                    updated_by: currentUser.id,
+                    polygon_path: polygonPath,
+                    center_lat: centroid.lat,
+                    center_lng: centroid.lng,
+                });
+                if (error) {
+                    console.error("Salvataggio area:", error);
+                    showMessage(`Errore salvataggio area: ${error.message}`, true);
+                    return;
+                }
+                showMessage("Area salvata.");
+                geofenceSettingsCache = null; // i dipendenti la ricaricano al prossimo avvio del watch
+                loadGeofenceIntoMap();
+            });
+        }
+
+        if (geofenceClearBtn) {
+            geofenceClearBtn.addEventListener("click", async () => {
+                if (!window.confirm("Rimuovere l'area di timbratura automatica? I dipendenti non potranno più usarla finché non ne configuri una nuova.")) return;
+                const { error } = await supabase.from("geofence_settings").upsert({
+                    id: 1,
+                    updated_by: currentUser.id,
+                    polygon_path: [],
+                    center_lat: 0,
+                    center_lng: 0,
+                });
+                if (error) {
+                    console.error("Rimozione area:", error);
+                    showMessage(`Errore: ${error.message}`, true);
+                    return;
+                }
+                if (geofenceDrawnItems) geofenceDrawnItems.clearLayers();
+                geofenceSettingsCache = null;
+                showMessage("Area rimossa.");
+                if (geofenceStatusEl) geofenceStatusEl.textContent = "Nessuna area configurata.";
+            });
+        }
+
         const VIEW_STORAGE_KEY = "badgeapp-active-view-v1";
-
-        /** Normalizza orario DB (HH:MM o HH:MM:SS) per input type=time con step=1 */
-        function normalizeTimeForInput(raw) {
-            if (raw == null || raw === "") return "";
-            const s = String(raw).trim();
-            const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-            if (!m) return s;
-            const hh = String(parseInt(m[1], 10)).padStart(2, "0");
-            const mm = String(parseInt(m[2], 10)).padStart(2, "0");
-            const ss = m[3] != null ? String(parseInt(m[3], 10)).padStart(2, "0") : "00";
-            return `${hh}:${mm}:${ss}`;
-        }
-
-        function timeToMinutes(time) {
-            if (!time) return 0;
-            const parts = String(time).trim().split(":");
-            const hours = parseInt(parts[0], 10) || 0;
-            const minutes = parseInt(parts[1], 10) || 0;
-            return hours * 60 + minutes;
-        }
-
-        /** Verifica sequenza orari incoerente (non conformità) */
-        function analyzePunchNonConformity(p) {
-            const issues = [];
-            if (!p) return issues;
-            const has = (f) => !!(p[f] && String(p[f]).trim());
-            const m = (f) => (has(f) ? timeToMinutes(p[f]) : null);
-            const inM = m("iniziomattina"), fm = m("finemattina"), ip = m("iniziopomeriggio"), fp = m("finepomeriggio");
-            if (inM != null && fm != null && fm < inM) issues.push("Fine mattina precedente all’inizio mattina.");
-            if (fm != null && ip != null && ip < fm) issues.push("Inizio pomeriggio precedente alla fine pausa.");
-            if (ip != null && fp != null && fp < ip) issues.push("Uscita precedente all’ingresso pomeriggio.");
-            if (fp != null && inM == null) issues.push("Uscita registrata senza ingresso mattina.");
-            return issues;
-        }
 
         function renderPunchNonConformity(p) {
             const el = document.getElementById("punch-nonconformity");
@@ -1143,54 +1080,7 @@
             el.innerHTML = "<strong>Non conformità orari:</strong><br/>" + issues.map((x) => "• " + x).join("<br/>");
         }
 
-        function minutesToHHMM(totalMinutes) {
-            if (totalMinutes === 0) return '00:00';
-            const sign = totalMinutes < 0 ? '-' : '';
-            const absMinutes = Math.abs(totalMinutes);
-            const hours = Math.floor(absMinutes / 60);
-            const minutes = absMinutes % 60;
-            return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-        }
         
-        /**
-         * Calcola i minuti effettivi lavorati (spezzato) O la durata lorda (continuato).
-         * @param {object} punch - Dati di timbratura giornaliera.
-         */
-        function calculateWorkMinutes(punch) {
-            const startMorning = timeToMinutes(punch.iniziomattina);
-            const endMorning = timeToMinutes(punch.finemattina);
-            const startAfternoon = timeToMinutes(punch.iniziopomeriggio);
-            const endAfternoon = timeToMinutes(punch.finepomeriggio);
-
-            let morningWork = 0;
-            let afternoonWork = 0;
-            // Calcola il segmento mattina
-            if (startMorning > 0 && endMorning > 0) {
-                 morningWork = endMorning - startMorning;
-            }
-            
-            // Calcola il segmento pomeriggio
-            if (startAfternoon > 0 && endAfternoon > 0) {
-                 afternoonWork = endAfternoon - startAfternoon;
-            }
-            
-            let totalWork = morningWork + afternoonWork;
-            // Logica per orario continuato o segmenti mancanti:
-            // Se il lavoro spezzato è zero (o incompleto) ma ci sono Inizio Mattina e Fine Pomeriggio (2 punch), 
-            // calcola la durata totale.
-            // (Questo copre i giorni da 13 ore).
-            if (totalWork === 0 && startMorning > 0 && endAfternoon > 0) {
-                 totalWork = endAfternoon - startMorning;
-            }
-
-            if (totalWork < 0) {
-                 console.warn("Conteggio minuti negativo, timbrature fuori sequenza. Ritorno 0.");
-                return 0;
-            }
-
-            return totalWork;
-        }
-
 
         // ------------------------------------------------
         // 🔹 Funzioni di Caricamento Dati e UI
@@ -1280,25 +1170,6 @@
         const REQUEST_TYPE_LABELS = { malattia: "Malattia", trasferta: "Trasferta", ferie: "Ferie" };
         const STATUS_LABELS = { saved: "Salvato", pending: "In attesa", approved: "Approvato", rejected: "Rifiutato" };
 
-        function inclusiveCalendarDays(startStr, endStr) {
-            const a = new Date(startStr + "T12:00:00");
-            const b = new Date(endStr + "T12:00:00");
-            if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 0;
-            const diff = Math.round((b - a) / 86400000);
-            return diff >= 0 ? diff + 1 : 0;
-        }
-
-        /** Giorni di trasferita che cadono nel mese (estremi inclusi, stringhe YYYY-MM-DD). */
-        function overlapDaysInMonthRange(startStr, endStr, year, month) {
-            const monthStartStr = `${year}-${String(month).padStart(2, "0")}-01`;
-            const lastDay = new Date(year, month, 0).getDate();
-            const monthEndStr = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-            const lo = startStr > monthStartStr ? startStr : monthStartStr;
-            const hi = endStr < monthEndStr ? endStr : monthEndStr;
-            if (lo > hi) return 0;
-            return inclusiveCalendarDays(lo, hi);
-        }
-
         /**
          * Ore da trasferta da sommare al riepilogo: se c’è total_hours_declared usa quello (già incl. viaggio),
          * altrimenti solo travel_hours. Prorata sui giorni del mese vs durata trasferta.
@@ -1376,7 +1247,7 @@
             if (error) {
                 console.error("employee_requests:", error);
                 employeeRequestsListEl.innerHTML =
-                    "<span style=\"color:#b91c1c;\">Impossibile caricare l'elenco. In Supabase → SQL Editor esegui <code>SUPABASE_SCHEMA.sql</code> (cartella web).</span>";
+                    "<span style=\"color:#b91c1c;\">Impossibile caricare l'elenco. In Supabase → SQL Editor esegui <code>SUPABASE_SCHEMA.sql</code>.</span>";
                 return;
             }
             if (!data || data.length === 0) {
@@ -1392,8 +1263,10 @@
                     extra = ` (${row.trasferta_scope === "TE" ? "Estero" : "Italia"})`;
                 }
                 if (row.request_type === "ferie") {
-                    const days = inclusiveCalendarDays(row.start_date, row.end_date);
-                    if (days > 0) extra = ` — ${days} giorni`;
+                    // Esclude sabato/domenica: nessuno "consuma" un giorno di ferie
+                    // per un weekend in cui comunque non lavorerebbe.
+                    const days = countBusinessDays(row.start_date, row.end_date);
+                    if (days > 0) extra = ` — ${days} giorni lavorativi`;
                 }
                 const st = STATUS_LABELS[row.status] || row.status;
                 const note = row.note
@@ -1492,7 +1365,6 @@
             
             payload.pausa_minuti = totalBreakMinutes > 0 ? totalBreakMinutes : null;
 
-
             // 5. Esegui l'Upsert
             const { error } = await supabase.from("daily_punches").upsert(payload, {
                 onConflict: "user_id,punch_date",
@@ -1556,7 +1428,7 @@
             }
 
             try {
-            const [punchResult, trasfertaExtraMinutes] = await Promise.all([
+            const [punchResult, trasfertaExtraMinutes, requestsResult] = await Promise.all([
                 supabase
                     .from("daily_punches")
                     .select("*")
@@ -1565,6 +1437,15 @@
                     .lte("punch_date", endDate)
                     .order("punch_date", { ascending: true }),
                 fetchTrasfertaExtraMinutesForMonth(userId, year, month),
+                // Malattia/trasferta/ferie non rifiutate che toccano il mese: servono per
+                // segnalare nel calendario anche i giorni senza alcuna timbratura (es. ferie).
+                supabase
+                    .from("employee_requests")
+                    .select("request_type, start_date, end_date, status")
+                    .eq("user_id", userId)
+                    .neq("status", "rejected")
+                    .lte("start_date", endDate)
+                    .gte("end_date", startDate),
             ]);
             if (historyGen !== loadHistoryGen) return;
 
@@ -1579,7 +1460,22 @@
 
             const list = punches || [];
 
-            if (list.length === 0) {
+            if (requestsResult.error) {
+                console.warn("Richieste del mese (calendario):", requestsResult.error);
+            }
+
+            // Una richiesta copre più giorni: mappata per data per un lookup immediato
+            // in fase di rendering (un giorno coperto da più richieste tiene l'ultima).
+            const requestsByDate = {};
+            for (const req of (requestsResult.data || [])) {
+                const lo = req.start_date > startDate ? req.start_date : startDate;
+                const hi = req.end_date < endDate ? req.end_date : endDate;
+                for (const d of enumerateDatesInRange(lo, hi)) {
+                    requestsByDate[d] = req;
+                }
+            }
+
+            if (list.length === 0 && Object.keys(requestsByDate).length === 0) {
                 punchesTableContainer.innerHTML = '<p style="text-align: center; color: #6b7280;">Nessuna timbratura trovata per il mese selezionato.</p>';
                 updateMonthlySummary(null, 0, 0, 0, trasfertaExtraMinutes);
                 return;
@@ -1605,46 +1501,85 @@
             let totalWorkMinutes = 0;
             let completedDays = 0;
             let totalPositiveExtraMinutes = 0;
-            
-            list.forEach(punch => {
-                const workMinutes = calculateWorkMinutes(punch);
-                let extraMinutes = 0;
-                // Condizioni per considerare un giorno come 'completo' e idoneo al calcolo straordinario:
-                const hasAllFour = punch.iniziomattina && punch.finemattina && punch.iniziopomeriggio && punch.finepomeriggio;
-                // Caso continuativo (copre i giorni da 13 ore senza pausa registrata):
-                const hasStartEndOnly = punch.iniziomattina && punch.finepomeriggio && !punch.finemattina && !punch.iniziopomeriggio;
 
-                if (hasAllFour || hasStartEndOnly) {
-                    completedDays++;
-                    extraMinutes = workMinutes - TARGET_WORK_MINUTES; // Calcolo dello straordinario giornaliero
-                    // Accumulo solo dello straordinario positivo per il totale mensile
-                    if (extraMinutes > 0) {
-                        totalPositiveExtraMinutes += extraMinutes;
+            // Colori coerenti con i pulsanti malattia/trasferta/ferie del resto dell'app.
+            const REQUEST_TYPE_COLORS = { malattia: '#e11d48', trasferta: '#ea580c', ferie: '#0d9488' };
+            const REQUEST_ROW_BG = { saved: '#fef9c3', pending: '#fef9c3', approved: '#dcfce7' };
+
+            const punchByDate = {};
+            for (const p of list) punchByDate[p.punch_date] = p;
+
+            // Ordine cronologico su UNA sola tabella: unione dei giorni con
+            // timbrature e dei giorni coperti da una richiesta.
+            const allDates = Array.from(new Set([...list.map(p => p.punch_date), ...Object.keys(requestsByDate)])).sort();
+
+            const fmt = (t) => (t && String(t).trim() !== "" ? normalizeTimeForInput(t) : "-");
+
+            allDates.forEach(dateStr => {
+                const punch = punchByDate[dateStr];
+                const req = requestsByDate[dateStr];
+                const dateLabel = new Date(dateStr).toLocaleDateString('it-IT');
+
+                if (punch) {
+                    const workMinutes = calculateWorkMinutes(punch);
+                    let extraMinutes = 0;
+                    // Condizioni per considerare un giorno come 'completo' e idoneo al calcolo straordinario:
+                    const hasAllFour = punch.iniziomattina && punch.finemattina && punch.iniziopomeriggio && punch.finepomeriggio;
+                    // Caso continuativo (copre i giorni da 13 ore senza pausa registrata):
+                    const hasStartEndOnly = punch.iniziomattina && punch.finepomeriggio && !punch.finemattina && !punch.iniziopomeriggio;
+
+                    if (hasAllFour || hasStartEndOnly) {
+                        completedDays++;
+                        extraMinutes = workMinutes - TARGET_WORK_MINUTES; // Calcolo dello straordinario giornaliero
+                        // Accumulo solo dello straordinario positivo per il totale mensile
+                        if (extraMinutes > 0) {
+                            totalPositiveExtraMinutes += extraMinutes;
+                        }
                     }
+
+                    totalWorkMinutes += workMinutes;
+
+                    const workedHHMM = minutesToHHMM(workMinutes);
+                    const extraHHMM = minutesToHHMM(extraMinutes);
+
+                    // Stile per evidenziare lo straordinario
+                    const extraStyle = extraMinutes > 0 ? 'color: green; font-weight: bold;' : (extraMinutes < 0 ?
+                        'color: red;' : '');
+
+                    // Un giorno può avere sia timbrature sia una richiesta che lo copre
+                    // (es. trasferta con orario parziale registrato): lo segnaliamo comunque.
+                    const badge = req
+                        ? ` <span style="font-size:0.72rem;font-weight:600;color:${REQUEST_TYPE_COLORS[req.request_type] || '#6b7280'};">(${REQUEST_TYPE_LABELS[req.request_type] || req.request_type})</span>`
+                        : '';
+
+                    tableHtml += `
+                        <tr>
+                            <td style="font-weight: 500;">${dateLabel}${badge}</td>
+                            <td>${fmt(punch.iniziomattina)}</td>
+                            <td>${fmt(punch.finemattina)}</td>
+                            <td>${fmt(punch.iniziopomeriggio)}</td>
+                            <td>${fmt(punch.finepomeriggio)}</td>
+                            <td>${punch.pausa_minuti || '0'}</td>
+                            <td style="font-weight: 500;">${workedHHMM}</td>
+                            <td style="background-color: #fef3c7; ${extraStyle}">${extraHHMM}</td>
+                        </tr>
+                    `;
+                } else if (req) {
+                    // Giorno senza alcuna timbratura ma coperto da una richiesta
+                    // (es. ferie): prima non compariva affatto nel calendario.
+                    const typeLabel = REQUEST_TYPE_LABELS[req.request_type] || req.request_type;
+                    const statusLabel = STATUS_LABELS[req.status] || req.status;
+                    const rowBg = REQUEST_ROW_BG[req.status] || '#f3f4f6';
+                    tableHtml += `
+                        <tr style="background-color: ${rowBg};">
+                            <td style="font-weight: 500;">${dateLabel}</td>
+                            <td colspan="7" style="text-align: center;">
+                                <strong style="color: ${REQUEST_TYPE_COLORS[req.request_type] || '#374151'};">${typeLabel}</strong>
+                                <span style="color: #6b7280; margin-left: 8px;">${statusLabel}</span>
+                            </td>
+                        </tr>
+                    `;
                 }
-                
-                totalWorkMinutes += workMinutes;
-
-                const workedHHMM = minutesToHHMM(workMinutes);
-                const extraHHMM = minutesToHHMM(extraMinutes);
-
-                // Stile per evidenziare lo straordinario
-                const extraStyle = extraMinutes > 0 ? 'color: green; font-weight: bold;' : (extraMinutes < 0 ?
-                    'color: red;' : '');
-
-                const fmt = (t) => (t && String(t).trim() !== "" ? normalizeTimeForInput(t) : "-");
-                tableHtml += `
-                    <tr>
-                        <td style="font-weight: 500;">${new Date(punch.punch_date).toLocaleDateString('it-IT')}</td>
-                        <td>${fmt(punch.iniziomattina)}</td>
-                        <td>${fmt(punch.finemattina)}</td>
-                        <td>${fmt(punch.iniziopomeriggio)}</td>
-                        <td>${fmt(punch.finepomeriggio)}</td>
-                        <td>${punch.pausa_minuti || '0'}</td>
-                        <td style="font-weight: 500;">${workedHHMM}</td>
-                        <td style="background-color: #fef3c7; ${extraStyle}">${extraHHMM}</td>
-                    </tr>
-                `;
             });
 
             tableHtml += '</tbody></table>';
@@ -1733,6 +1668,7 @@
                     if (shouldRestoreView) {
                         hasInitializedAppView = true;
                         restoreViewAfterLogin();
+                        initGeoAutoPunchIfEnabled();
                     } else {
                         refreshCurrentViewData();
                     }
@@ -1740,6 +1676,7 @@
                     currentUser = null;
                     isAdmin = false;
                     hasInitializedAppView = false;
+                    stopGeoAutoPunchWatch();
                     showView(loginView);
                 }
             } catch (err) {
@@ -1825,6 +1762,92 @@
             });
         }
 
+        /**
+         * Richieste malattia/trasferta/ferie in attesa di una decisione (stato
+         * "saved" o "pending") di TUTTI i dipendenti, con nome/email per contesto.
+         * employee_requests.user_id referenzia auth.users, non profiles: niente
+         * embedding automatico via PostgREST, quindi due query e un join lato client.
+         */
+        async function loadPendingRequests() {
+            if (!isAdmin || !pendingRequestsUl) return;
+            pendingRequestsUl.innerHTML = '<li style="color: #6b7280;">Caricamento...</li>';
+
+            const { data: requests, error } = await supabase
+                .from('employee_requests')
+                .select('id, user_id, request_type, start_date, end_date, note, status, trasferta_scope, travel_hours, total_hours_declared, created_at')
+                .in('status', ['saved', 'pending'])
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error("ERRORE CARICAMENTO RICHIESTE:", error);
+                pendingRequestsUl.innerHTML = `<li style="color: #dc2626;">Errore: ${error.message}</li>`;
+                return;
+            }
+
+            if (!requests || requests.length === 0) {
+                pendingRequestsUl.innerHTML = '<li style="color: #6b7280;">Nessuna richiesta in attesa.</li>';
+                return;
+            }
+
+            const userIds = [...new Set(requests.map(r => r.user_id))];
+            const { data: profs } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name, email')
+                .in('id', userIds);
+            const profileById = Object.fromEntries((profs || []).map(p => [p.id, p]));
+
+            pendingRequestsUl.innerHTML = requests.map(req => {
+                const profile = profileById[req.user_id];
+                const employeeName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email : req.user_id;
+                const tipo = REQUEST_TYPE_LABELS[req.request_type] || req.request_type;
+                const d0 = new Date(req.start_date).toLocaleDateString('it-IT');
+                const d1 = new Date(req.end_date).toLocaleDateString('it-IT');
+                let extra = '';
+                if (req.request_type === 'trasferta' && req.trasferta_scope) {
+                    extra = ` (${req.trasferta_scope === 'TE' ? 'Estero' : 'Italia'})`;
+                } else if (req.request_type === 'ferie') {
+                    const days = countBusinessDays(req.start_date, req.end_date);
+                    if (days > 0) extra = ` — ${days} giorni lavorativi`;
+                }
+                const note = req.note
+                    ? `<div style="font-size:0.8rem;color:#6b7280;margin-top:2px;">${String(req.note).slice(0, 150)}</div>`
+                    : '';
+                return `
+                    <li style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;">
+                        <div>
+                            <strong>${employeeName}</strong> — ${tipo}${extra}: ${d0} – ${d1}
+                            ${note}
+                        </div>
+                        <div style="display:flex; gap:8px; flex-shrink:0;">
+                            <button type="button" class="approve-request-btn" data-request-id="${req.id}" style="background-color:#16a34a; color:white; padding:6px 12px; border-radius:6px; font-size:0.85rem;">Approva</button>
+                            <button type="button" class="reject-request-btn" data-request-id="${req.id}" style="background-color:#dc2626; color:white; padding:6px 12px; border-radius:6px; font-size:0.85rem;">Rifiuta</button>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+
+            pendingRequestsUl.querySelectorAll('.approve-request-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => updateRequestStatus(e.currentTarget.dataset.requestId, 'approved'));
+            });
+            pendingRequestsUl.querySelectorAll('.reject-request-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => updateRequestStatus(e.currentTarget.dataset.requestId, 'rejected'));
+            });
+        }
+
+        async function updateRequestStatus(requestId, newStatus) {
+            if (!isAdmin || !currentUser || !requestId) return;
+            const { error } = await supabase
+                .from('employee_requests')
+                .update({ status: newStatus, reviewed_by: currentUser.id, reviewed_at: new Date().toISOString() })
+                .eq('id', requestId);
+            if (error) {
+                console.error("Aggiornamento stato richiesta:", error);
+                showMessage(`Errore: ${error.message}`, true);
+                return;
+            }
+            showMessage(newStatus === 'approved' ? 'Richiesta approvata.' : 'Richiesta rifiutata.');
+            loadPendingRequests();
+        }
 
         // ------------------------------------------------
         // 🔹 Logica Nuova Timbratura Mancante (Abilitata per tutti)
@@ -2070,12 +2093,13 @@
             }
         }
 
-
         // 🔹 Gestione del click sul tasto Admin fisso
         fixedAdminBtn.addEventListener("click", async () => {
             if (isAdmin) {
                 showView(adminView);
                 await loadAllProfiles();
+                loadPendingRequests();
+                initGeofenceMapIfNeeded();
             } else {
                 currentHistoryUserId = null;
                 historyTitlePrefixEl.textContent = "Storico Timbrature";
@@ -2378,6 +2402,21 @@
             }
         });
 
+    </script>
+
+    <script>
+        // Registrazione service worker: abilita installabilità (PWA) e app
+        // shell disponibile offline. Non blocca né ritarda in alcun modo il
+        // caricamento della pagina (post-load, fire-and-forget) e non deve
+        // mai impedire l'uso dell'app se fallisce (es. su http:// non
+        // sicuro, o browser senza supporto).
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch((err) => {
+                    console.warn('Registrazione service worker fallita (non bloccante):', err);
+                });
+            });
+        }
     </script>
 </body>
 </html>
