@@ -65,6 +65,21 @@ l'area configurata dall'admin) e SOLO per registrare l'ingresso mattutino
 quando manca. L'area (poligono) è configurabile dal pannello admin.
 
 --------------------------------------------------
+Funzioni admin: presenze live e export CSV
+--------------------------------------------------
+Pannello admin:
+- "Presenze di oggi": stato di ciascun dipendente (in sede/in pausa/uscito/
+  assente) derivato dalle timbrature odierne, si aggiorna da solo ogni 30s
+  finché resti su quella vista. Nessuna posizione GPS individuale — coerente
+  con la nota privacy sopra.
+
+Vista storico (dipendente e admin):
+- "Esporta CSV" accanto al selettore periodo: scarica esattamente la tabella
+  a schermo per il mese selezionato (nessuna query aggiuntiva), con in coda i
+  totali del "Riepilogo Mensile". Apribile in Excel/Fogli Google (UTF-8 con
+  BOM, corretto con le lettere accentate italiane).
+
+--------------------------------------------------
 Workaround standby Supabase (Free)
 --------------------------------------------------
 Workflow già pronto nel repository (gira automaticamente ogni 2 giorni):

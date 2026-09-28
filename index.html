@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
     <title>Timbrature Online</title>
-    <meta name="theme-color" content="#4f46e5" />
+    <meta name="theme-color" content="#1d4ed8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="Timbratura, storico ore e richieste (trasferta, malattia, ferie) per i dipendenti." />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
@@ -183,7 +185,10 @@
         
         <div id="history-month-controls">
             <label for="month-select">Periodo (mese e anno)</label>
-            <select id="month-select" aria-label="Seleziona mese e anno per lo storico"></select>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <select id="month-select" aria-label="Seleziona mese e anno per lo storico" style="flex:1; min-width:180px;"></select>
+                <button type="button" id="export-history-csv-btn" style="background-color:#0f766e; color:white; white-space:nowrap;">Esporta CSV</button>
+            </div>
         </div>
         <div id="admin-history-controls" class="hidden">
             <p id="current-admin-name" style="font-weight: 600;
@@ -215,8 +220,19 @@
             </div>
         </div>
 
+        <div style="border: 1px solid #d1d5db; border-radius: 12px; padding: 20px; background-color: #f9fafb; margin-bottom: 20px;">
+            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #16a34a;">Presenze di oggi</h3>
+            <p style="font-size: 0.85rem; color: #6b7280; margin: 0 0 10px 0;">
+                Stato calcolato dalle timbrature odierne di ciascun dipendente — nessuna posizione GPS individuale viene mai salvata o mostrata.
+            </p>
+            <div id="today-presence-summary" style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; font-size:0.85rem;"></div>
+            <ul id="today-presence-ul">
+                <li style="color: #6b7280;">Caricamento...</li>
+            </ul>
+        </div>
+
         <div class="form-grid">
-            
+
             <div class="form-section">
                 <h3 style="font-size: 1.25rem;
                     font-weight: 700; margin-bottom: 15px; color: #22c55e;">Aggiungi Nuovo Dipendente</h3>
@@ -426,6 +442,9 @@
             hasUsableGeofence,
             enumerateDatesInRange,
             countBusinessDays,
+            computePresenceStatus,
+            latestPunchTime,
+            rowsToCsv,
         } from './js/utils.js';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -500,6 +519,8 @@
         const userEmailEl = document.getElementById("user-email");
         const profilesUl = document.getElementById("profiles-ul");
         const pendingRequestsUl = document.getElementById("pending-requests-ul");
+        const todayPresenceUl = document.getElementById("today-presence-ul");
+        const todayPresenceSummaryEl = document.getElementById("today-presence-summary");
         const timbraBtn = document.getElementById("timbraBtn");
         const timbraMessageEl = document.getElementById("timbra-message");
         const historyBtn = document.getElementById("history-btn");
@@ -508,7 +529,8 @@
         const historyUserDisplayEl = document.getElementById("history-user-display");
         const adminHistoryControlsEl = document.getElementById("admin-history-controls");
         const punchesTableContainer = document.getElementById("punches-table-container");
-        const monthSelect = document.getElementById("month-select"); 
+        const monthSelect = document.getElementById("month-select");
+        const exportHistoryCsvBtn = document.getElementById("export-history-csv-btn");
         const summaryTotalDays = document.getElementById("summary-total-days");
         const summaryTotalWork = document.getElementById("summary-total-work");
         const summaryTotalExtra = document.getElementById("summary-total-extra");
@@ -617,6 +639,7 @@
         // Mappa admin per disegnare l'area (inizializzata solo quando si apre il pannello)
         let geofenceMap = null;
         let geofenceDrawnItems = null;
+        let todayPresenceInterval = null;
 
         // Mappa gli stati con i nomi dei campi
         const punchSteps = [
@@ -661,6 +684,13 @@
             } else {
                 fixedAdminBtn.classList.add("hidden");
             }
+            // Dashboard "Presenze di oggi": auto-refresh SOLO mentre l'admin
+            // è su quella vista, mai in background su altre schermate.
+            if (viewToShow === adminView) {
+                startTodayPresenceAutoRefresh();
+            } else {
+                stopTodayPresenceAutoRefresh();
+            }
         }
 
         /** Aggiorna solo i dati della vista corrente (senza cambiare schermata) */
@@ -675,6 +705,7 @@
             } else if (!adminView.classList.contains("hidden") && isAdmin) {
                 loadAllProfiles();
                 loadPendingRequests();
+                loadTodayPresence();
             }
         }
 
@@ -696,6 +727,7 @@
                 showView(adminView);
                 loadAllProfiles();
                 loadPendingRequests();
+                loadTodayPresence();
                 initGeofenceMapIfNeeded();
                 return;
             }
@@ -1768,6 +1800,93 @@
          * employee_requests.user_id referenzia auth.users, non profiles: niente
          * embedding automatico via PostgREST, quindi due query e un join lato client.
          */
+        /** Avvia il polling della dashboard presenze (ogni 30s, solo se admin). */
+        function startTodayPresenceAutoRefresh() {
+            stopTodayPresenceAutoRefresh();
+            if (!isAdmin) return;
+            todayPresenceInterval = setInterval(loadTodayPresence, 30000);
+        }
+        function stopTodayPresenceAutoRefresh() {
+            if (todayPresenceInterval) {
+                clearInterval(todayPresenceInterval);
+                todayPresenceInterval = null;
+            }
+        }
+
+        const PRESENCE_STYLES = {
+            in_sede: { label: 'In sede', dot: '#16a34a', text: '#15803d' },
+            in_pausa: { label: 'In pausa', dot: '#f59e0b', text: '#b45309' },
+            uscito: { label: 'Uscito', dot: '#6b7280', text: '#4b5563' },
+            assente: { label: 'Assente', dot: '#dc2626', text: '#b91c1c' },
+        };
+        const PRESENCE_ORDER = ['in_sede', 'in_pausa', 'uscito', 'assente'];
+
+        /**
+         * Dashboard "Presenze di oggi": stato per dipendente derivato dalle
+         * timbrature odierne (computePresenceStatus). Nessuna posizione GPS
+         * individuale viene letta o mostrata — coerente con la scelta di
+         * privacy già fatta per la timbratura automatica per posizione.
+         */
+        async function loadTodayPresence() {
+            if (!isAdmin || !todayPresenceUl) return;
+            todayPresenceUl.innerHTML = '<li style="color: #6b7280;">Caricamento...</li>';
+
+            const today = getTodayDateString();
+            const [{ data: profiles, error: profilesError }, { data: punches, error: punchesError }] = await Promise.all([
+                supabase.from('profiles').select('id, first_name, last_name, email').order('first_name', { ascending: true }),
+                supabase.from('daily_punches').select('user_id, iniziomattina, finemattina, iniziopomeriggio, finepomeriggio').eq('punch_date', today),
+            ]);
+
+            const loadError = profilesError || punchesError;
+            if (loadError) {
+                console.error("ERRORE CARICAMENTO PRESENZE:", loadError);
+                todayPresenceUl.innerHTML = `<li style="color: #dc2626;">Errore: ${loadError.message}</li>`;
+                if (todayPresenceSummaryEl) todayPresenceSummaryEl.innerHTML = '';
+                return;
+            }
+
+            const punchByUser = Object.fromEntries((punches || []).map(p => [p.user_id, p]));
+            const rows = (profiles || []).map(p => {
+                const punch = punchByUser[p.id] || null;
+                return {
+                    name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email,
+                    status: computePresenceStatus(punch),
+                    time: latestPunchTime(punch),
+                };
+            });
+
+            if (todayPresenceSummaryEl) {
+                const counts = rows.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
+                todayPresenceSummaryEl.innerHTML = PRESENCE_ORDER.map(key => `
+                    <span style="display:inline-flex; align-items:center; gap:6px;">
+                        <span style="width:10px; height:10px; border-radius:50%; background:${PRESENCE_STYLES[key].dot}; display:inline-block;"></span>
+                        ${PRESENCE_STYLES[key].label}: <strong>${counts[key] || 0}</strong>
+                    </span>
+                `).join('');
+            }
+
+            if (rows.length === 0) {
+                todayPresenceUl.innerHTML = '<li style="color: #6b7280;">Nessun dipendente registrato.</li>';
+                return;
+            }
+
+            const orderIndex = Object.fromEntries(PRESENCE_ORDER.map((k, i) => [k, i]));
+            rows.sort((a, b) => (orderIndex[a.status] ?? 9) - (orderIndex[b.status] ?? 9) || a.name.localeCompare(b.name, 'it'));
+
+            todayPresenceUl.innerHTML = rows.map(r => {
+                const style = PRESENCE_STYLES[r.status];
+                return `
+                    <li style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid #e5e7eb;">
+                        <span>${r.name}</span>
+                        <span style="display:inline-flex; align-items:center; gap:6px; font-size:0.8rem; color:${style.text}; font-weight:600; white-space:nowrap;">
+                            <span style="width:8px; height:8px; border-radius:50%; background:${style.dot}; display:inline-block;"></span>
+                            ${style.label}${r.time ? ` · ${r.time}` : ''}
+                        </span>
+                    </li>
+                `;
+            }).join('');
+        }
+
         async function loadPendingRequests() {
             if (!isAdmin || !pendingRequestsUl) return;
             pendingRequestsUl.innerHTML = '<li style="color: #6b7280;">Caricamento...</li>';
@@ -2099,6 +2218,7 @@
                 showView(adminView);
                 await loadAllProfiles();
                 loadPendingRequests();
+                loadTodayPresence();
                 initGeofenceMapIfNeeded();
             } else {
                 currentHistoryUserId = null;
@@ -2157,6 +2277,52 @@
                 loadPunchesHistory(userId, e.target.value, userName);
             }, 300);
         });
+
+        /**
+         * Legge la tabella storico attualmente renderizzata (nessuna nuova query:
+         * esporta esattamente quello che l'utente vede a schermo) e la converte
+         * in righe di celle testuali per rowsToCsv().
+         */
+        function extractVisibleTableRows(table) {
+            return Array.from(table.querySelectorAll('tr')).map((row) =>
+                Array.from(row.querySelectorAll('th, td')).map((cell) =>
+                    cell.textContent.trim().replace(/\s+/g, ' ')
+                )
+            );
+        }
+
+        function downloadTextFile(filename, content, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportHistoryToCsv() {
+            const table = punchesTableContainer.querySelector('#punches-table');
+            if (!table) {
+                showMessage('Nessuna timbratura da esportare per il periodo selezionato.', true);
+                return;
+            }
+            const rows = extractVisibleTableRows(table);
+            // Righe di riepilogo in coda, stesse cifre mostrate in "Riepilogo Mensile".
+            rows.push([]);
+            rows.push([summaryTotalDays.textContent]);
+            rows.push([summaryTotalWork.textContent]);
+            rows.push([summaryTotalExtra.textContent]);
+
+            const who = (historyUserDisplayEl.textContent || 'personale').trim().replace(/[^\p{L}\p{N}]+/gu, '_') || 'personale';
+            const period = monthSelect.value || 'periodo';
+            downloadTextFile(`timbrature_${who}_${period}.csv`, rowsToCsv(rows), 'text/csv;charset=utf-8;');
+        }
+        if (exportHistoryCsvBtn) {
+            exportHistoryCsvBtn.addEventListener('click', exportHistoryToCsv);
+        }
 
         // Tasto Indietro da Storico (header + footer)
         function goBackFromHistoryToPunch() {

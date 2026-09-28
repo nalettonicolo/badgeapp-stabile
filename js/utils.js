@@ -240,3 +240,61 @@ export function hasUsableGeofence(settings) {
     const { center_lat, center_lng } = settings;
     return Number.isFinite(center_lat) && Number.isFinite(center_lng) && !(center_lat === 0 && center_lng === 0);
 }
+
+// -----------------------------------------------------------------------------
+// Dashboard presenze live (admin) — SOLO stato derivato dalle timbrature del
+// giorno, mai posizione GPS individuale: coerente con la scelta di privacy già
+// fatta per la timbratura automatica (nessuna posizione salvata sul server).
+// -----------------------------------------------------------------------------
+
+/**
+ * Stato di presenza di un dipendente oggi, derivato dalla riga di
+ * daily_punches odierna (o null/assente se non esiste).
+ * Copre sia l'orario spezzato (mattina/pausa/pomeriggio) sia quello
+ * continuato (solo iniziomattina + finepomeriggio, vedi calculateWorkMinutes).
+ * @returns {'assente'|'in_sede'|'in_pausa'|'uscito'}
+ */
+export function computePresenceStatus(punch) {
+    const has = (f) => !!(punch && punch[f] && String(punch[f]).trim());
+    if (!has('iniziomattina')) return 'assente';
+    if (has('finepomeriggio')) return 'uscito';
+    if (has('iniziopomeriggio')) return 'in_sede';
+    if (has('finemattina')) return 'in_pausa';
+    return 'in_sede';
+}
+
+// -----------------------------------------------------------------------------
+// Export CSV — funzione pura di formattazione (RFC 4180): l'estrazione delle
+// righe dal DOM resta in index.html, qui solo la trasformazione dati→testo,
+// così è testabile senza un browser.
+// -----------------------------------------------------------------------------
+
+/**
+ * Converte una matrice di righe (array di array di celle, già come stringhe o
+ * numeri) in una stringa CSV: virgolette solo dove servono (RFC 4180), CRLF
+ * come separatore di riga, BOM UTF-8 in testa per l'apertura corretta in
+ * Excel con lettere accentate italiane.
+ */
+export function rowsToCsv(rows) {
+    const escapeCell = (value) => {
+        const text = value == null ? "" : String(value);
+        if (/[",\r\n]/.test(text)) {
+            return `"${text.replace(/"/g, '""')}"`;
+        }
+        return text;
+    };
+    const body = (rows || []).map((row) => row.map(escapeCell).join(",")).join("\r\n");
+    return "﻿" + body;
+}
+
+/** Orario dell'ultimo evento di timbratura registrato oggi (HH:MM), o null. */
+export function latestPunchTime(punch) {
+    if (!punch) return null;
+    const fieldsMostRecentFirst = ['finepomeriggio', 'iniziopomeriggio', 'finemattina', 'iniziomattina'];
+    for (const f of fieldsMostRecentFirst) {
+        if (punch[f] && String(punch[f]).trim()) {
+            return normalizeTimeForInput(punch[f]).slice(0, 5);
+        }
+    }
+    return null;
+}
