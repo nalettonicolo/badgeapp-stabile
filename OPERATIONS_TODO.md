@@ -27,19 +27,20 @@ che l'agente non ha. Vanno fatti a mano dal proprietario del progetto.
 
 ## Branding / design (decisione di prodotto, non tecnica)
 
-- [x] **Icone web (PWA) e mobile rifatte** (rigenerate, non più placeholder):
-  stesso soggetto — badge con quadrante d'orologio — ma ridisegnato con
-  gradiente allineato al brand reale della UI (`var(--brand)` #1d4ed8 →
-  `var(--brand-dark)` #1e3a8a in `styles.css`, non più l'indigo #4f46e5
-  residuo). `badgeapp-mobile/assets/icon.png` (e adaptive/splash/favicon)
-  non sono più il template di default di Expo. Icona maskable e adaptive
-  Android con il glifo correttamente confinato nella safe zone (non
-  ritagliato dalle maschere circolari/squircle dei launcher). Se in futuro
-  arriva un logo aziendale reale, sostituire gli stessi file mantenendo
+- [x] **Logo "T" (Timbrature) su icone web (PWA) e mobile**: monogramma
+  vettoriale disegnato ad hoc (non un glifo generico orologio come nella
+  versione precedente), gradiente brand (`var(--brand)` #1d4ed8 →
+  `var(--brand-dark)` #1e3a8a). Copre TUTTI i contesti "salva su schermata
+  home": `apple-touch-icon` (iOS Safari → Aggiungi a Home), le tre icone
+  di `manifest.webmanifest` (Android/Chrome → Installa app), e
+  `badgeapp-mobile/assets/icon.png` + `adaptive-icon.png` (icona app
+  nativa iOS/Android via Expo/EAS quando pubblicata). Icona maskable e
+  adaptive Android con il glifo confinato nella safe zone (non ritagliato
+  dalle maschere circolari/squircle dei launcher).
+- [ ] **Logo aziendale reale** (opzionale): il monogramma "T" è un design
+  originale, non un logo aziendale registrato. Se l'azienda ha (o vuole)
+  un logo proprio diverso, può sostituire questi stessi file mantenendo
   nomi/dimensioni.
-- [ ] **Logo aziendale reale** (opzionale): l'icona attuale è un glifo
-  generico "orologio" in stile geometrico, non un logo brandizzato.
-  Se l'azienda ha un logo proprio, può sostituire questo design.
 
 ## Osservabilità (decisione di prodotto/budget)
 
