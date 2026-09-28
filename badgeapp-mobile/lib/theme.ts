@@ -10,9 +10,10 @@ export const colors = {
   text: '#0f172a',
   textSecondary: '#64748b',
   textMuted: '#94a3b8',
-  primary: '#4f46e5',
-  primaryPressed: '#4338ca',
-  primaryMuted: '#eef2ff',
+  // Allineato al brand della webapp (styles.css: --brand / --brand-dark).
+  primary: '#1d4ed8',
+  primaryPressed: '#1e3a8a',
+  primaryMuted: '#eff6ff',
   onPrimary: '#ffffff',
   success: '#059669',
   successMuted: '#ecfdf5',

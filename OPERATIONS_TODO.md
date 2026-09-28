@@ -27,16 +27,19 @@ che l'agente non ha. Vanno fatti a mano dal proprietario del progetto.
 
 ## Branding / design (decisione di prodotto, non tecnica)
 
-- [ ] **Icona PWA/favicon** (`icons/*.png`, Fase 5): generata come placeholder
-  (badge indigo con un semplice glifo a orologio, colori presi da
-  `styles.css`) perché `badgeapp-mobile/assets/icon.png` è ancora il
-  template di default di Expo (la griglia guida mai sostituita con un logo
-  vero) e non era utilizzabile. Se esiste un logo reale, sostituire i file
-  in `icons/` (192, 512, 512 maskable, favicon 32) mantenendo gli stessi nomi.
-- [ ] **Icona app mobile**: `badgeapp-mobile/assets/icon.png`,
-  `adaptive-icon.png`, `splash-icon.png` sono ancora il placeholder Expo di
-  default — finiranno così anche sugli store se non sostituiti prima della
-  pubblicazione.
+- [x] **Icone web (PWA) e mobile rifatte** (rigenerate, non più placeholder):
+  stesso soggetto — badge con quadrante d'orologio — ma ridisegnato con
+  gradiente allineato al brand reale della UI (`var(--brand)` #1d4ed8 →
+  `var(--brand-dark)` #1e3a8a in `styles.css`, non più l'indigo #4f46e5
+  residuo). `badgeapp-mobile/assets/icon.png` (e adaptive/splash/favicon)
+  non sono più il template di default di Expo. Icona maskable e adaptive
+  Android con il glifo correttamente confinato nella safe zone (non
+  ritagliato dalle maschere circolari/squircle dei launcher). Se in futuro
+  arriva un logo aziendale reale, sostituire gli stessi file mantenendo
+  nomi/dimensioni.
+- [ ] **Logo aziendale reale** (opzionale): l'icona attuale è un glifo
+  generico "orologio" in stile geometrico, non un logo brandizzato.
+  Se l'azienda ha un logo proprio, può sostituire questo design.
 
 ## Osservabilità (decisione di prodotto/budget)
 
