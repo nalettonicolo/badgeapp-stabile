@@ -21,6 +21,7 @@ import {
   hasUsableGeofence,
   computePresenceStatus,
   latestPunchTime,
+  rowsToCsv,
 } from '../js/utils.js';
 
 test('isLikelyNetworkError riconosce errori di rete', () => {
@@ -297,6 +298,32 @@ test('computePresenceStatus: orario spezzato, ogni fase intermedia', () => {
 test('computePresenceStatus: orario continuato (solo iniziomattina + finepomeriggio)', () => {
   assert.equal(computePresenceStatus({ iniziomattina: '08:00' }), 'in_sede');
   assert.equal(computePresenceStatus({ iniziomattina: '08:00', finepomeriggio: '17:00' }), 'uscito');
+});
+
+test('rowsToCsv: righe semplici separate da virgola e CRLF, con BOM UTF-8 in testa', () => {
+  const csv = rowsToCsv([
+    ['Data', 'Ore'],
+    ['26/09', '8:00'],
+    ['27/09', '7:30'],
+  ]);
+  assert.equal(csv, '﻿Data,Ore\r\n26/09,8:00\r\n27/09,7:30');
+});
+
+test('rowsToCsv: quoting RFC 4180 per celle con virgole, virgolette o a capo', () => {
+  const csv = rowsToCsv([
+    ['Nome', 'Nota'],
+    ['Rossi, Mario', 'Dice "ok"'],
+    ['Bianchi', 'Riga1\nRiga2'],
+  ]);
+  assert.equal(
+    csv,
+    '﻿Nome,Nota\r\n"Rossi, Mario","Dice ""ok"""\r\nBianchi,"Riga1\nRiga2"'
+  );
+});
+
+test('rowsToCsv: valori null/undefined diventano celle vuote, array vuoto è solo il BOM', () => {
+  assert.equal(rowsToCsv([['a', null, undefined, 'b']]), '﻿a,,,b');
+  assert.equal(rowsToCsv([]), '﻿');
 });
 
 test('latestPunchTime: null/vuoto → null, altrimenti l\'evento più avanzato normalizzato a HH:MM', () => {

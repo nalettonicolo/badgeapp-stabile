@@ -157,3 +157,12 @@ test('la dashboard "Presenze di oggi" esiste, usa lo stato derivato (mai posizio
   assert.match(js, /function stopTodayPresenceAutoRefresh/);
   assert.match(js, /viewToShow === adminView/);
 });
+
+test('export CSV storico: bottone presente, esporta la tabella già a schermo (nessuna nuova query)', () => {
+  assert.ok(html.includes('id="export-history-csv-btn"'), 'manca #export-history-csv-btn');
+  const js = extractInlineModuleScript();
+  assert.match(js, /function exportHistoryToCsv/);
+  assert.match(js, /function extractVisibleTableRows/);
+  assert.match(js, /rowsToCsv\(rows\)/);
+  assert.match(js, /punchesTableContainer\.querySelector\(['"]#punches-table['"]\)/);
+});

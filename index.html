@@ -185,7 +185,10 @@
         
         <div id="history-month-controls">
             <label for="month-select">Periodo (mese e anno)</label>
-            <select id="month-select" aria-label="Seleziona mese e anno per lo storico"></select>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <select id="month-select" aria-label="Seleziona mese e anno per lo storico" style="flex:1; min-width:180px;"></select>
+                <button type="button" id="export-history-csv-btn" style="background-color:#0f766e; color:white; white-space:nowrap;">Esporta CSV</button>
+            </div>
         </div>
         <div id="admin-history-controls" class="hidden">
             <p id="current-admin-name" style="font-weight: 600;
@@ -441,6 +444,7 @@
             countBusinessDays,
             computePresenceStatus,
             latestPunchTime,
+            rowsToCsv,
         } from './js/utils.js';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -525,7 +529,8 @@
         const historyUserDisplayEl = document.getElementById("history-user-display");
         const adminHistoryControlsEl = document.getElementById("admin-history-controls");
         const punchesTableContainer = document.getElementById("punches-table-container");
-        const monthSelect = document.getElementById("month-select"); 
+        const monthSelect = document.getElementById("month-select");
+        const exportHistoryCsvBtn = document.getElementById("export-history-csv-btn");
         const summaryTotalDays = document.getElementById("summary-total-days");
         const summaryTotalWork = document.getElementById("summary-total-work");
         const summaryTotalExtra = document.getElementById("summary-total-extra");
@@ -2272,6 +2277,52 @@
                 loadPunchesHistory(userId, e.target.value, userName);
             }, 300);
         });
+
+        /**
+         * Legge la tabella storico attualmente renderizzata (nessuna nuova query:
+         * esporta esattamente quello che l'utente vede a schermo) e la converte
+         * in righe di celle testuali per rowsToCsv().
+         */
+        function extractVisibleTableRows(table) {
+            return Array.from(table.querySelectorAll('tr')).map((row) =>
+                Array.from(row.querySelectorAll('th, td')).map((cell) =>
+                    cell.textContent.trim().replace(/\s+/g, ' ')
+                )
+            );
+        }
+
+        function downloadTextFile(filename, content, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportHistoryToCsv() {
+            const table = punchesTableContainer.querySelector('#punches-table');
+            if (!table) {
+                showMessage('Nessuna timbratura da esportare per il periodo selezionato.', true);
+                return;
+            }
+            const rows = extractVisibleTableRows(table);
+            // Righe di riepilogo in coda, stesse cifre mostrate in "Riepilogo Mensile".
+            rows.push([]);
+            rows.push([summaryTotalDays.textContent]);
+            rows.push([summaryTotalWork.textContent]);
+            rows.push([summaryTotalExtra.textContent]);
+
+            const who = (historyUserDisplayEl.textContent || 'personale').trim().replace(/[^\p{L}\p{N}]+/gu, '_') || 'personale';
+            const period = monthSelect.value || 'periodo';
+            downloadTextFile(`timbrature_${who}_${period}.csv`, rowsToCsv(rows), 'text/csv;charset=utf-8;');
+        }
+        if (exportHistoryCsvBtn) {
+            exportHistoryCsvBtn.addEventListener('click', exportHistoryToCsv);
+        }
 
         // Tasto Indietro da Storico (header + footer)
         function goBackFromHistoryToPunch() {

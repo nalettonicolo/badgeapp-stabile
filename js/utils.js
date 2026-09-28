@@ -263,6 +263,30 @@ export function computePresenceStatus(punch) {
     return 'in_sede';
 }
 
+// -----------------------------------------------------------------------------
+// Export CSV — funzione pura di formattazione (RFC 4180): l'estrazione delle
+// righe dal DOM resta in index.html, qui solo la trasformazione dati→testo,
+// così è testabile senza un browser.
+// -----------------------------------------------------------------------------
+
+/**
+ * Converte una matrice di righe (array di array di celle, già come stringhe o
+ * numeri) in una stringa CSV: virgolette solo dove servono (RFC 4180), CRLF
+ * come separatore di riga, BOM UTF-8 in testa per l'apertura corretta in
+ * Excel con lettere accentate italiane.
+ */
+export function rowsToCsv(rows) {
+    const escapeCell = (value) => {
+        const text = value == null ? "" : String(value);
+        if (/[",\r\n]/.test(text)) {
+            return `"${text.replace(/"/g, '""')}"`;
+        }
+        return text;
+    };
+    const body = (rows || []).map((row) => row.map(escapeCell).join(",")).join("\r\n");
+    return "﻿" + body;
+}
+
 /** Orario dell'ultimo evento di timbratura registrato oggi (HH:MM), o null. */
 export function latestPunchTime(punch) {
     if (!punch) return null;
