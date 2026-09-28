@@ -23,7 +23,7 @@
     <button id="fixed-admin-btn" class="hidden">Admin</button>
 
     <div id="loading-view" style="text-align: center; max-width: 22rem; padding: 24px 16px;">
-        <p style="font-size: 1.125rem; color: #4b5563; margin: 0 0 8px;">Caricamento in corso…</p>
+        <p style="font-size: 1.125rem; margin: 0 0 8px;">Caricamento in corso…</p>
         <p id="loading-slow-hint" class="hidden" style="font-size: 0.875rem; color: #6b7280; margin: 0 0 12px;">
             Sta impiegando più del previsto. Controlla la connessione.
         </p>
@@ -33,7 +33,7 @@
     </div>
 
     <div id="login-view" class="hidden">
-        <h1 style="font-size: 2rem; margin-bottom: 1rem; text-align: center; font-weight: bold; color: #4b5563;">Accesso Timbrature</h1>
+        <h1 style="font-size: 2rem; margin-bottom: 1rem; text-align: center;">Accesso Timbrature</h1>
         <form id="login-form" style="display: flex; flex-direction: column; gap: 16px;">
             <input type="email" 
                 id="email" placeholder="Email" required />
@@ -47,7 +47,7 @@
 
     <div id="recovery-password-modal" class="modal hidden">
         <div class="modal-content">
-            <h3 style="font-size: 1.35rem; margin-bottom: 10px; color: #1f2937; text-align: center;">Imposta nuova password</h3>
+            <h3 class="section-title" style="text-align: center;">Imposta nuova password</h3>
             <p style="font-size: 0.9rem; color: #6b7280; margin-bottom: 16px;">
                 Hai aperto il link dall’email di reset. Scegli una nuova password per il tuo account.
             </p>
@@ -67,8 +67,7 @@
     <div id="punch-view" class="hidden">
         <div class="view-header">
             <div>
-                <h2 style="color: 
-                    #1f2937;">Benvenuto, <span id="user-name" style="font-weight: 600;"></span></h2>
+                <h2>Benvenuto, <span id="user-name" style="font-weight: 600;"></span></h2>
                 <p>Le tue timbrature giornaliere |
                     Email: <span id="user-email"></span></p>
             </div>
@@ -112,7 +111,7 @@
 
         <div style="border: 
             1px solid #bfdbfe; background-color: #eff6ff; border-radius: 12px; padding: 24px;">
-            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: #1d4ed8;">Timbrature odierne</h3>
+            <h3 class="section-title" style="margin-bottom: 1rem;">Timbrature odierne</h3>
 
             <p style="font-size: 0.85rem; color: #6b7280; margin: -0.5rem 0 0.75rem 0">
                 Richieste malattia / trasferta / ferie: usa i pulsanti sopra o quelli qui sotto (stessa funzione).
@@ -171,9 +170,7 @@
     <div id="history-view" class="hidden">
         <div class="view-header">
             <div style="display: flex; align-items: center; gap: 10px;"> 
-                <h2 style="color: #1f2937;"><span id="history-title-prefix">Storico Timbrature</span> <span id="history-user-display" style="font-weight: 700;
-                    /* Rimosso colore blu */
-                    color: inherit;"></span></h2>
+                <h2><span id="history-title-prefix">Storico Timbrature</span> <span id="history-user-display" style="font-weight: 700;"></span></h2>
                 <button id="add-punch-btn" aria-label="Inserisci timbratura mancante" style="background-color: #2563eb; color: white; padding: 6px 10px; border-radius: 6px; font-weight: 600; font-size: 1.1rem; line-height: 1;">
                     +
                 </button>
@@ -196,8 +193,7 @@
         </div>
 
         <div id="punches-table-container">
-            <p style="text-align: center;
-                color: #6b7280;">Caricamento storico…</p>
+            <p class="state-msg">Caricamento storico…</p>
         </div>
 
         <div id="monthly-summary">
@@ -214,28 +210,27 @@
     
     <div id="admin-view" class="hidden">
         <div class="view-header">
-            <h2 style="color: #1f2937;">Pannello di Amministrazione</h2>
+            <h2>Pannello di Amministrazione</h2>
             <div class="view-controls">
                  <button type="button" id="back-from-admin-btn" class="btn-timbrature" style="max-width: 260px; padding: 10px 14px;">Torna alle timbrature</button>
             </div>
         </div>
 
-        <div style="border: 1px solid #d1d5db; border-radius: 12px; padding: 20px; background-color: #f9fafb; margin-bottom: 20px;">
-            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #16a34a;">Presenze di oggi</h3>
-            <p style="font-size: 0.85rem; color: #6b7280; margin: 0 0 10px 0;">
+        <div class="panel-box">
+            <h3 class="section-title">Presenze di oggi</h3>
+            <p style="font-size: 0.85rem; margin: 0 0 10px 0;">
                 Stato calcolato dalle timbrature odierne di ciascun dipendente — nessuna posizione GPS individuale viene mai salvata o mostrata.
             </p>
             <div id="today-presence-summary" style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; font-size:0.85rem;"></div>
             <ul id="today-presence-ul">
-                <li style="color: #6b7280;">Caricamento...</li>
+                <li class="state-msg">Caricamento...</li>
             </ul>
         </div>
 
         <div class="form-grid">
 
             <div class="form-section">
-                <h3 style="font-size: 1.25rem;
-                    font-weight: 700; margin-bottom: 15px; color: #22c55e;">Aggiungi Nuovo Dipendente</h3>
+                <h3 class="section-title">Aggiungi Nuovo Dipendente</h3>
                 <form id="add-employee-form">
                     <input type="text" id="new-employee-first-name" placeholder="Nome" required />
                     <input type="text" id="new-employee-last-name" placeholder="Cognome" required />
@@ -256,8 +251,7 @@
             </div>
 
             <div class="form-section">
-                <h3 style="font-size: 1.25rem;
-                    font-weight: 700; margin-bottom: 15px; color: #f97316;">Reset Password Dipendente</h3>
+                <h3 class="section-title">Reset Password Dipendente</h3>
                 <form id="reset-password-form">
                     <p style="font-size: 0.875rem;
                         color: #6b7280;">Invia email di reset reale. Inserisci UID o email del dipendente.</p>
@@ -269,9 +263,9 @@
             </div>
         </div>
 
-        <div style="border: 1px solid #d1d5db; border-radius: 12px; padding: 20px; background-color: #f9fafb; margin-bottom: 20px;">
-            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #7c3aed;">Area timbratura automatica (posizione)</h3>
-            <p style="font-size: 0.85rem; color: #6b7280; margin: 0 0 10px 0; line-height: 1.4;">
+        <div class="panel-box">
+            <h3 class="section-title">Area timbratura automatica (posizione)</h3>
+            <p style="font-size: 0.85rem; margin: 0 0 10px 0; line-height: 1.4;">
                 Disegna l'area (es. il perimetro della sede): un dipendente con la timbratura automatica attiva e l'ingresso mattutino non ancora registrato lo vedrà timbrato da solo entrandovi.
                 Cerca un indirizzo per centrare la mappa, poi usa lo strumento poligono (icona a sinistra sulla mappa) per disegnarla e premi «Salva area».
             </p>
@@ -287,22 +281,20 @@
             </div>
         </div>
 
-        <div style="border: 1px solid #d1d5db; border-radius: 12px; padding: 20px; background-color: #f9fafb; margin-bottom: 20px;">
-            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #0891b2;">Richieste da approvare</h3>
-            <p style="font-size: 0.85rem; color: #6b7280; margin: 0 0 10px 0;">
+        <div class="panel-box">
+            <h3 class="section-title">Richieste da approvare</h3>
+            <p style="font-size: 0.85rem; margin: 0 0 10px 0;">
                 Malattia, trasferta e ferie inviate dai dipendenti. Approva o rifiuta: lo stato si aggiorna anche nello storico timbrature del dipendente e nella sua lista «Ultime richieste».
             </p>
             <ul id="pending-requests-ul">
-                <li style="color: #6b7280;">Caricamento...</li>
+                <li class="state-msg">Caricamento...</li>
             </ul>
         </div>
 
-        <div style="border: 1px solid #d1d5db;
-            border-radius: 12px; padding: 20px; background-color: #f9fafb;">
-            <h3 style="font-size: 1.25rem;
-                font-weight: 700; margin-bottom: 1rem; color: #4b5563;">Elenco Dipendenti Registrati (Clicca UID per storico)</h3>
+        <div class="panel-box" style="margin-bottom: 0;">
+            <h3 class="section-title">Elenco Dipendenti Registrati (Clicca UID per storico)</h3>
             <ul id="profiles-ul">
-                <li style="color: #6b7280;">Caricamento...</li>
+                <li class="state-msg">Caricamento...</li>
             </ul>
         </div>
         <div class="nav-footer-timbrature">
@@ -312,8 +304,7 @@
 
     <div id="manual-punch-modal" class="modal hidden">
         <div class="modal-content">
-            <h3 style="font-size: 1.5rem;
-                margin-bottom: 20px; color: #059669; text-align: center;">Timbratura Manuale</h3>
+            <h3 class="section-title" style="font-size: 1.35rem; text-align: center; margin-bottom: 20px;">Timbratura Manuale</h3>
             <form id="manual-punch-form" style="display: flex;
                 flex-direction: column; gap: 15px;">
                 <p style="color: #ef4444;
@@ -342,7 +333,7 @@
 
     <div id="insert-punch-modal" class="modal hidden">
         <div class="modal-content">
-            <h3 style="font-size: 1.5rem; margin-bottom: 20px; color: #2563eb; text-align: center;">Inserisci timbrature giornaliere mancanti</h3>
+            <h3 class="section-title" style="font-size: 1.35rem; text-align: center; margin-bottom: 20px;">Inserisci timbrature giornaliere mancanti</h3>
             <form id="insert-punch-form" style="display: flex; flex-direction: column; gap: 15px;">
 
                 <label for="insert-date" style="font-weight: 600;">Data:</label>
@@ -383,7 +374,7 @@
 
     <div id="employee-request-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 440px;">
-            <h3 id="employee-request-modal-title" style="font-size: 1.35rem; margin-bottom: 16px; text-align: center; color: #1f2937;">Richiesta</h3>
+            <h3 id="employee-request-modal-title" class="section-title" style="text-align: center; margin-bottom: 16px;">Richiesta</h3>
             <form id="employee-request-form" style="display: flex; flex-direction: column; gap: 14px;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <div>
@@ -1419,7 +1410,7 @@
          */
         async function loadPunchesHistory(userId, monthYear, userName = '') {
             if (!userId) {
-                punchesTableContainer.innerHTML = '<p style="text-align: center; color: #dc2626;">Errore: ID Utente mancante.</p>';
+                punchesTableContainer.innerHTML = '<p class="state-msg state-msg--error">Errore: ID Utente mancante.</p>';
                 return;
             }
             const historyGen = ++loadHistoryGen;
@@ -1430,18 +1421,18 @@
             }
             if (!my || !/^\d{4}-\d{2}$/.test(my)) {
                 punchesTableContainer.innerHTML =
-                    '<p style="text-align: center; color: #dc2626;">Seleziona un periodo (mese/anno) nel menu sopra.</p>';
+                    '<p class="state-msg state-msg--error">Seleziona un periodo (mese/anno) nel menu sopra.</p>';
                 updateMonthlySummary(null, 0, 0, 0, 0);
                 return;
             }
 
-            punchesTableContainer.innerHTML = '<p style="text-align: center; color: #4b5563;">Caricamento storico...</p>';
+            punchesTableContainer.innerHTML = '<p class="state-msg">Caricamento storico...</p>';
             historyUserDisplayEl.textContent = userName;
 
             const [year, month] = my.split("-").map(Number);
             if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
                 punchesTableContainer.innerHTML =
-                    '<p style="text-align: center; color: #dc2626;">Periodo non valido.</p>';
+                    '<p class="state-msg state-msg--error">Periodo non valido.</p>';
                 updateMonthlySummary(null, 0, 0, 0, 0);
                 return;
             }
@@ -1454,7 +1445,7 @@
             } catch (e) {
                 console.error("loadPunchesHistory date:", e);
                 punchesTableContainer.innerHTML =
-                    '<p style="text-align: center; color: #dc2626;">Impossibile calcolare le date del periodo.</p>';
+                    '<p class="state-msg state-msg--error">Impossibile calcolare le date del periodo.</p>';
                 updateMonthlySummary(null, 0, 0, 0, 0);
                 return;
             }
@@ -1485,7 +1476,7 @@
 
             if (error) {
                 console.error("ERRORE STORICO:", error);
-                punchesTableContainer.innerHTML = `<p style="text-align: center; color: #dc2626;">Errore caricamento storico: ${error.message}</p>`;
+                punchesTableContainer.innerHTML = `<p class="state-msg state-msg--error">Errore caricamento storico: ${error.message}</p>`;
                 updateMonthlySummary(null, 0, 0, 0, trasfertaExtraMinutes);
                 return;
             }
@@ -1508,7 +1499,7 @@
             }
 
             if (list.length === 0 && Object.keys(requestsByDate).length === 0) {
-                punchesTableContainer.innerHTML = '<p style="text-align: center; color: #6b7280;">Nessuna timbratura trovata per il mese selezionato.</p>';
+                punchesTableContainer.innerHTML = '<p class="state-msg">Nessuna timbratura trovata per il mese selezionato.</p>';
                 updateMonthlySummary(null, 0, 0, 0, trasfertaExtraMinutes);
                 return;
             }
@@ -1622,7 +1613,7 @@
             } catch (err) {
                 console.error("loadPunchesHistory:", err);
                 punchesTableContainer.innerHTML =
-                    '<p style="text-align: center; color: #dc2626;">Errore caricamento storico. Controlla la connessione e riprova.</p>';
+                    '<p class="state-msg state-msg--error">Errore caricamento storico. Controlla la connessione e riprova.</p>';
                 updateMonthlySummary(null, 0, 0, 0, 0);
             }
         }
@@ -1727,7 +1718,7 @@
         
         async function loadAllProfiles(filter = 'all') {
             if (!isAdmin) {
-                profilesUl.innerHTML = '<li style="color: #dc2626;">Accesso negato. Solo amministratori.</li>';
+                profilesUl.innerHTML = '<li class="state-msg state-msg--error">Accesso negato. Solo amministratori.</li>';
                 return;
             }
             
@@ -1743,12 +1734,12 @@
 
             if (error) {
                 console.error("ERRORE CARICAMENTO PROFILI:", error);
-                profilesUl.innerHTML = `<li style="color: #dc2626;">Errore: ${error.message}</li>`;
+                profilesUl.innerHTML = `<li class="state-msg state-msg--error">Errore: ${error.message}</li>`;
                 return;
             }
-            
+
             if (data.length === 0) {
-                 profilesUl.innerHTML = '<li style="color: #6b7280;">Nessun dipendente trovato.</li>';
+                 profilesUl.innerHTML = '<li class="state-msg">Nessun dipendente trovato.</li>';
                 return;
             }
 
@@ -1829,7 +1820,7 @@
          */
         async function loadTodayPresence() {
             if (!isAdmin || !todayPresenceUl) return;
-            todayPresenceUl.innerHTML = '<li style="color: #6b7280;">Caricamento...</li>';
+            todayPresenceUl.innerHTML = '<li class="state-msg">Caricamento...</li>';
 
             const today = getTodayDateString();
             const [{ data: profiles, error: profilesError }, { data: punches, error: punchesError }] = await Promise.all([
@@ -1840,7 +1831,7 @@
             const loadError = profilesError || punchesError;
             if (loadError) {
                 console.error("ERRORE CARICAMENTO PRESENZE:", loadError);
-                todayPresenceUl.innerHTML = `<li style="color: #dc2626;">Errore: ${loadError.message}</li>`;
+                todayPresenceUl.innerHTML = `<li class="state-msg state-msg--error">Errore: ${loadError.message}</li>`;
                 if (todayPresenceSummaryEl) todayPresenceSummaryEl.innerHTML = '';
                 return;
             }
@@ -1866,7 +1857,7 @@
             }
 
             if (rows.length === 0) {
-                todayPresenceUl.innerHTML = '<li style="color: #6b7280;">Nessun dipendente registrato.</li>';
+                todayPresenceUl.innerHTML = '<li class="state-msg">Nessun dipendente registrato.</li>';
                 return;
             }
 
@@ -1889,7 +1880,7 @@
 
         async function loadPendingRequests() {
             if (!isAdmin || !pendingRequestsUl) return;
-            pendingRequestsUl.innerHTML = '<li style="color: #6b7280;">Caricamento...</li>';
+            pendingRequestsUl.innerHTML = '<li class="state-msg">Caricamento...</li>';
 
             const { data: requests, error } = await supabase
                 .from('employee_requests')
@@ -1899,12 +1890,12 @@
 
             if (error) {
                 console.error("ERRORE CARICAMENTO RICHIESTE:", error);
-                pendingRequestsUl.innerHTML = `<li style="color: #dc2626;">Errore: ${error.message}</li>`;
+                pendingRequestsUl.innerHTML = `<li class="state-msg state-msg--error">Errore: ${error.message}</li>`;
                 return;
             }
 
             if (!requests || requests.length === 0) {
-                pendingRequestsUl.innerHTML = '<li style="color: #6b7280;">Nessuna richiesta in attesa.</li>';
+                pendingRequestsUl.innerHTML = '<li class="state-msg">Nessuna richiesta in attesa.</li>';
                 return;
             }
 
