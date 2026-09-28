@@ -217,8 +217,19 @@
             </div>
         </div>
 
+        <div style="border: 1px solid #d1d5db; border-radius: 12px; padding: 20px; background-color: #f9fafb; margin-bottom: 20px;">
+            <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #16a34a;">Presenze di oggi</h3>
+            <p style="font-size: 0.85rem; color: #6b7280; margin: 0 0 10px 0;">
+                Stato calcolato dalle timbrature odierne di ciascun dipendente — nessuna posizione GPS individuale viene mai salvata o mostrata.
+            </p>
+            <div id="today-presence-summary" style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; font-size:0.85rem;"></div>
+            <ul id="today-presence-ul">
+                <li style="color: #6b7280;">Caricamento...</li>
+            </ul>
+        </div>
+
         <div class="form-grid">
-            
+
             <div class="form-section">
                 <h3 style="font-size: 1.25rem;
                     font-weight: 700; margin-bottom: 15px; color: #22c55e;">Aggiungi Nuovo Dipendente</h3>
@@ -428,6 +439,8 @@
             hasUsableGeofence,
             enumerateDatesInRange,
             countBusinessDays,
+            computePresenceStatus,
+            latestPunchTime,
         } from './js/utils.js';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -502,6 +515,8 @@
         const userEmailEl = document.getElementById("user-email");
         const profilesUl = document.getElementById("profiles-ul");
         const pendingRequestsUl = document.getElementById("pending-requests-ul");
+        const todayPresenceUl = document.getElementById("today-presence-ul");
+        const todayPresenceSummaryEl = document.getElementById("today-presence-summary");
         const timbraBtn = document.getElementById("timbraBtn");
         const timbraMessageEl = document.getElementById("timbra-message");
         const historyBtn = document.getElementById("history-btn");
@@ -619,6 +634,7 @@
         // Mappa admin per disegnare l'area (inizializzata solo quando si apre il pannello)
         let geofenceMap = null;
         let geofenceDrawnItems = null;
+        let todayPresenceInterval = null;
 
         // Mappa gli stati con i nomi dei campi
         const punchSteps = [
@@ -663,6 +679,13 @@
             } else {
                 fixedAdminBtn.classList.add("hidden");
             }
+            // Dashboard "Presenze di oggi": auto-refresh SOLO mentre l'admin
+            // è su quella vista, mai in background su altre schermate.
+            if (viewToShow === adminView) {
+                startTodayPresenceAutoRefresh();
+            } else {
+                stopTodayPresenceAutoRefresh();
+            }
         }
 
         /** Aggiorna solo i dati della vista corrente (senza cambiare schermata) */
@@ -677,6 +700,7 @@
             } else if (!adminView.classList.contains("hidden") && isAdmin) {
                 loadAllProfiles();
                 loadPendingRequests();
+                loadTodayPresence();
             }
         }
 
@@ -698,6 +722,7 @@
                 showView(adminView);
                 loadAllProfiles();
                 loadPendingRequests();
+                loadTodayPresence();
                 initGeofenceMapIfNeeded();
                 return;
             }
@@ -1770,6 +1795,93 @@
          * employee_requests.user_id referenzia auth.users, non profiles: niente
          * embedding automatico via PostgREST, quindi due query e un join lato client.
          */
+        /** Avvia il polling della dashboard presenze (ogni 30s, solo se admin). */
+        function startTodayPresenceAutoRefresh() {
+            stopTodayPresenceAutoRefresh();
+            if (!isAdmin) return;
+            todayPresenceInterval = setInterval(loadTodayPresence, 30000);
+        }
+        function stopTodayPresenceAutoRefresh() {
+            if (todayPresenceInterval) {
+                clearInterval(todayPresenceInterval);
+                todayPresenceInterval = null;
+            }
+        }
+
+        const PRESENCE_STYLES = {
+            in_sede: { label: 'In sede', dot: '#16a34a', text: '#15803d' },
+            in_pausa: { label: 'In pausa', dot: '#f59e0b', text: '#b45309' },
+            uscito: { label: 'Uscito', dot: '#6b7280', text: '#4b5563' },
+            assente: { label: 'Assente', dot: '#dc2626', text: '#b91c1c' },
+        };
+        const PRESENCE_ORDER = ['in_sede', 'in_pausa', 'uscito', 'assente'];
+
+        /**
+         * Dashboard "Presenze di oggi": stato per dipendente derivato dalle
+         * timbrature odierne (computePresenceStatus). Nessuna posizione GPS
+         * individuale viene letta o mostrata — coerente con la scelta di
+         * privacy già fatta per la timbratura automatica per posizione.
+         */
+        async function loadTodayPresence() {
+            if (!isAdmin || !todayPresenceUl) return;
+            todayPresenceUl.innerHTML = '<li style="color: #6b7280;">Caricamento...</li>';
+
+            const today = getTodayDateString();
+            const [{ data: profiles, error: profilesError }, { data: punches, error: punchesError }] = await Promise.all([
+                supabase.from('profiles').select('id, first_name, last_name, email').order('first_name', { ascending: true }),
+                supabase.from('daily_punches').select('user_id, iniziomattina, finemattina, iniziopomeriggio, finepomeriggio').eq('punch_date', today),
+            ]);
+
+            const loadError = profilesError || punchesError;
+            if (loadError) {
+                console.error("ERRORE CARICAMENTO PRESENZE:", loadError);
+                todayPresenceUl.innerHTML = `<li style="color: #dc2626;">Errore: ${loadError.message}</li>`;
+                if (todayPresenceSummaryEl) todayPresenceSummaryEl.innerHTML = '';
+                return;
+            }
+
+            const punchByUser = Object.fromEntries((punches || []).map(p => [p.user_id, p]));
+            const rows = (profiles || []).map(p => {
+                const punch = punchByUser[p.id] || null;
+                return {
+                    name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email,
+                    status: computePresenceStatus(punch),
+                    time: latestPunchTime(punch),
+                };
+            });
+
+            if (todayPresenceSummaryEl) {
+                const counts = rows.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
+                todayPresenceSummaryEl.innerHTML = PRESENCE_ORDER.map(key => `
+                    <span style="display:inline-flex; align-items:center; gap:6px;">
+                        <span style="width:10px; height:10px; border-radius:50%; background:${PRESENCE_STYLES[key].dot}; display:inline-block;"></span>
+                        ${PRESENCE_STYLES[key].label}: <strong>${counts[key] || 0}</strong>
+                    </span>
+                `).join('');
+            }
+
+            if (rows.length === 0) {
+                todayPresenceUl.innerHTML = '<li style="color: #6b7280;">Nessun dipendente registrato.</li>';
+                return;
+            }
+
+            const orderIndex = Object.fromEntries(PRESENCE_ORDER.map((k, i) => [k, i]));
+            rows.sort((a, b) => (orderIndex[a.status] ?? 9) - (orderIndex[b.status] ?? 9) || a.name.localeCompare(b.name, 'it'));
+
+            todayPresenceUl.innerHTML = rows.map(r => {
+                const style = PRESENCE_STYLES[r.status];
+                return `
+                    <li style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid #e5e7eb;">
+                        <span>${r.name}</span>
+                        <span style="display:inline-flex; align-items:center; gap:6px; font-size:0.8rem; color:${style.text}; font-weight:600; white-space:nowrap;">
+                            <span style="width:8px; height:8px; border-radius:50%; background:${style.dot}; display:inline-block;"></span>
+                            ${style.label}${r.time ? ` · ${r.time}` : ''}
+                        </span>
+                    </li>
+                `;
+            }).join('');
+        }
+
         async function loadPendingRequests() {
             if (!isAdmin || !pendingRequestsUl) return;
             pendingRequestsUl.innerHTML = '<li style="color: #6b7280;">Caricamento...</li>';
@@ -2101,6 +2213,7 @@
                 showView(adminView);
                 await loadAllProfiles();
                 loadPendingRequests();
+                loadTodayPresence();
                 initGeofenceMapIfNeeded();
             } else {
                 currentHistoryUserId = null;

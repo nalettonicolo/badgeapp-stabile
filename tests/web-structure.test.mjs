@@ -145,3 +145,15 @@ test('il flusso di approvazione richieste esiste ed esclude le rifiutate dal cal
   // Le richieste rifiutate non devono comparire come assenza nello storico.
   assert.match(js, /\.neq\(\s*["']status["'],\s*["']rejected["']\s*\)/);
 });
+
+test('la dashboard "Presenze di oggi" esiste, usa lo stato derivato (mai posizione GPS) e si aggiorna solo mentre l\'admin la guarda', () => {
+  assert.ok(html.includes('id="today-presence-ul"'), 'manca #today-presence-ul');
+  assert.ok(html.includes('id="today-presence-summary"'), 'manca #today-presence-summary');
+  const js = extractInlineModuleScript();
+  assert.match(js, /async function loadTodayPresence/);
+  assert.match(js, /computePresenceStatus\(punch\)/);
+  // Auto-refresh legato al ciclo di vita della vista admin (mai in background altrove).
+  assert.match(js, /function startTodayPresenceAutoRefresh/);
+  assert.match(js, /function stopTodayPresenceAutoRefresh/);
+  assert.match(js, /viewToShow === adminView/);
+});

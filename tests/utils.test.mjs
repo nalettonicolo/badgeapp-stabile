@@ -19,6 +19,8 @@ import {
   pointInPolygon,
   isInsideGeofence,
   hasUsableGeofence,
+  computePresenceStatus,
+  latestPunchTime,
 } from '../js/utils.js';
 
 test('isLikelyNetworkError riconosce errori di rete', () => {
@@ -268,4 +270,48 @@ test('hasUsableGeofence: rispecchia la logica di isInsideGeofence sulla disponib
   assert.equal(hasUsableGeofence({ polygon_path: [], center_lat: 45.0, center_lng: 9.0 }), true);
   assert.equal(hasUsableGeofence({ polygon_path: [], center_lat: 0, center_lng: 0 }), false);
   assert.equal(hasUsableGeofence(null), false);
+});
+
+test('computePresenceStatus: nessuna timbratura è "assente"', () => {
+  assert.equal(computePresenceStatus(null), 'assente');
+  assert.equal(computePresenceStatus(undefined), 'assente');
+  assert.equal(computePresenceStatus({}), 'assente');
+  assert.equal(computePresenceStatus({ iniziomattina: '' }), 'assente');
+});
+
+test('computePresenceStatus: orario spezzato, ogni fase intermedia', () => {
+  assert.equal(computePresenceStatus({ iniziomattina: '08:00' }), 'in_sede');
+  assert.equal(computePresenceStatus({ iniziomattina: '08:00', finemattina: '12:00' }), 'in_pausa');
+  assert.equal(
+    computePresenceStatus({ iniziomattina: '08:00', finemattina: '12:00', iniziopomeriggio: '13:00' }),
+    'in_sede'
+  );
+  assert.equal(
+    computePresenceStatus({
+      iniziomattina: '08:00', finemattina: '12:00', iniziopomeriggio: '13:00', finepomeriggio: '17:00',
+    }),
+    'uscito'
+  );
+});
+
+test('computePresenceStatus: orario continuato (solo iniziomattina + finepomeriggio)', () => {
+  assert.equal(computePresenceStatus({ iniziomattina: '08:00' }), 'in_sede');
+  assert.equal(computePresenceStatus({ iniziomattina: '08:00', finepomeriggio: '17:00' }), 'uscito');
+});
+
+test('latestPunchTime: null/vuoto → null, altrimenti l\'evento più avanzato normalizzato a HH:MM', () => {
+  assert.equal(latestPunchTime(null), null);
+  assert.equal(latestPunchTime({}), null);
+  assert.equal(latestPunchTime({ iniziomattina: '08:00:00' }), '08:00');
+  assert.equal(latestPunchTime({ iniziomattina: '08:00', finemattina: '12:00' }), '12:00');
+  assert.equal(
+    latestPunchTime({ iniziomattina: '08:00', finemattina: '12:00', iniziopomeriggio: '13:05' }),
+    '13:05'
+  );
+  assert.equal(
+    latestPunchTime({
+      iniziomattina: '08:00', finemattina: '12:00', iniziopomeriggio: '13:00', finepomeriggio: '17:32',
+    }),
+    '17:32'
+  );
 });
