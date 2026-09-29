@@ -138,6 +138,16 @@ test('la timbratura automatica per posizione tocca solo il campo di ingresso mat
   assert.match(js, /punchSteps\[0\]\.field/);
 });
 
+test('la timbratura automatica tenta ad ogni lettura "dentro l\'area", non solo sulla transizione fuori→dentro', () => {
+  // Bug reale (corretto): su iOS Safari sospende la pagina in background e il
+  // watch riparte da zero al rientro in foreground — chi è GIÀ in sede quando
+  // riapre l'app non veniva mai rilevato da una logica basata solo sulla
+  // transizione (nessuno stato "fuori" precedente da cui transitare).
+  const js = extractInlineModuleScript();
+  assert.match(js, /if\s*\(\s*insideNow\s*===\s*true\s*\)\s*\{\s*attemptAutoMorningPunch\(\);/);
+  assert.doesNotMatch(js, /wasInsideGeofence/);
+});
+
 test('il flusso di approvazione richieste esiste ed esclude le rifiutate dal calendario', () => {
   const js = extractInlineModuleScript();
   assert.match(js, /async function loadPendingRequests/);

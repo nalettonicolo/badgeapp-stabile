@@ -626,7 +626,6 @@
         const GEO_AUTOPUNCH_STORAGE_KEY = "badgeapp-geo-autopunch-enabled-v1";
         let geofenceSettingsCache = null;
         let geoWatchId = null;
-        let wasInsideGeofence = null;
         // Mappa admin per disegnare l'area (inizializzata solo quando si apre il pannello)
         let geofenceMap = null;
         let geofenceDrawnItems = null;
@@ -836,7 +835,6 @@
                 navigator.geolocation.clearWatch(geoWatchId);
             }
             geoWatchId = null;
-            wasInsideGeofence = null;
         }
 
         /**
@@ -897,10 +895,18 @@
                     const maxAcc = Number.isFinite(settings.max_accuracy_meters) ? settings.max_accuracy_meters : 60;
                     if (Number.isFinite(accuracy) && accuracy > maxAcc) return; // lettura troppo imprecisa: ignorata, niente cambio di stato
                     const insideNow = isInsideGeofence(latitude, longitude, settings);
-                    if (wasInsideGeofence === false && insideNow === true) {
+                    // Tenta ad OGNI rilevamento "dentro", non solo sulla transizione
+                    // fuori→dentro (bug reale, corretto qui): su iOS Safari sospende
+                    // la pagina in background e il watch riparte da zero ogni volta
+                    // che l'app viene riaperta — il caso più comune è proprio "sono
+                    // già in sede quando riapro l'app", che con la sola transizione
+                    // non veniva mai rilevato (nessuno stato "fuori" precedente da
+                    // cui transitare). attemptAutoMorningPunch() è già idempotente
+                    // (verifica fresca su Supabase prima di scrivere), quindi
+                    // richiamarla ad ogni lettura "dentro" è sicuro.
+                    if (insideNow === true) {
                         attemptAutoMorningPunch();
                     }
-                    wasInsideGeofence = insideNow;
                     if (geoAutoPunchStatusEl) {
                         geoAutoPunchStatusEl.textContent = insideNow
                             ? "Sei nell'area: se manca l'ingresso mattutino verrà timbrato a breve."
