@@ -177,6 +177,29 @@ test('export CSV storico: bottone presente, esporta la tabella già a schermo (n
   assert.match(js, /punchesTableContainer\.querySelector\(['"]#punches-table['"]\)/);
 });
 
+test('pannello admin "Monte ore ferie/ROL/permessi": selettore dipendente/anno, righe per tipo, carico/salvataggio', () => {
+  for (const id of ['leave-balance-employee-select', 'leave-balance-year-input', 'leave-balance-load-btn', 'leave-balance-save-btn']) {
+    assert.ok(html.includes(`id="${id}"`), `manca #${id}`);
+  }
+  for (const type of ['ferie', 'rol', 'permesso']) {
+    assert.ok(html.includes(`data-leave-type="${type}"`), `manca la riga monte ore per "${type}"`);
+  }
+  const js = extractInlineModuleScript();
+  assert.match(js, /async function loadLeaveBalanceForSelection/);
+  assert.match(js, /async function saveLeaveBalanceForSelection/);
+  // Upsert su tutti e tre i tipi in un colpo, coerente con la UNIQUE(user_id, year, leave_type).
+  assert.match(js, /supabase\.from\(['"]leave_balances['"]\)\.upsert\(rows/);
+  assert.match(js, /onConflict:\s*['"]user_id,year,leave_type['"]/);
+});
+
+test('prospetto ferie/ROL/permessi lato dipendente usa le funzioni pure computeLeaveUsage/computeLeaveProspectus', () => {
+  assert.ok(html.includes('id="leave-prospectus-body"'), 'manca #leave-prospectus-body');
+  const js = extractInlineModuleScript();
+  assert.match(js, /async function loadLeaveProspectus/);
+  assert.match(js, /computeLeaveUsage\(requests \|\| \[\], leaveType, year\)/);
+  assert.match(js, /computeLeaveProspectus\(balance, used\)/);
+});
+
 test('ROL è una categoria di richiesta separata da permesso, con pulsanti, campo ore e colore propri', () => {
   for (const id of ['req-rol-head', 'req-rol-btn', 'req-rol-fields', 'req-rol-hours']) {
     assert.ok(html.includes(`id="${id}"`), `manca #${id}`);

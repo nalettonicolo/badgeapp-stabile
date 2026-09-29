@@ -155,6 +155,12 @@
                     <button type="button" id="req-rol-btn" style="background-color: #7c3aed; color: white;">ROL</button>
                 </div>
             </div>
+            <div id="leave-prospectus-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
+                <p style="font-weight: 700; margin: 0 0 0.5rem 0; color: #374151; font-size: 0.95rem;">Prospetto ferie, ROL e permessi <span id="leave-prospectus-year" style="font-weight: 400; color: #6b7280;"></span></p>
+                <div id="leave-prospectus-body" style="font-size: 0.82rem; color: #374151; line-height: 1.5;">
+                    <p class="state-msg">Caricamento...</p>
+                </div>
+            </div>
             <div id="geo-autopunch-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <input type="checkbox" id="geo-autopunch-toggle" style="width: auto;" />
@@ -288,11 +294,53 @@
         <div class="panel-box">
             <h3 class="section-title">Richieste da approvare</h3>
             <p style="font-size: 0.85rem; margin: 0 0 10px 0;">
-                Malattia, trasferta e ferie inviate dai dipendenti. Approva o rifiuta: lo stato si aggiorna anche nello storico timbrature del dipendente e nella sua lista «Ultime richieste».
+                Malattia, trasferta, ferie e ROL inviate dai dipendenti. Approva o rifiuta: lo stato si aggiorna anche nello storico timbrature del dipendente e nella sua lista «Ultime richieste».
             </p>
             <ul id="pending-requests-ul">
                 <li class="state-msg">Caricamento...</li>
             </ul>
+        </div>
+
+        <div class="panel-box">
+            <h3 class="section-title">Monte ore ferie / ROL / permessi</h3>
+            <p style="font-size: 0.85rem; margin: 0 0 10px 0; line-height: 1.4;">
+                Imposta, per ogni dipendente e anno, quanto maturato da contratto (ferie in giorni, ROL e permessi in ore) ed eventuale riporto dall'anno precedente. Il residuo si calcola sottraendo le richieste già approvate.
+            </p>
+            <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; align-items: flex-end;">
+                <div style="flex: 1; min-width: 220px;">
+                    <label for="leave-balance-employee-select" style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Dipendente</label>
+                    <select id="leave-balance-employee-select" style="width: 100%;"></select>
+                </div>
+                <div style="min-width: 100px;">
+                    <label for="leave-balance-year-input" style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Anno</label>
+                    <input type="number" id="leave-balance-year-input" style="width: 100%;" />
+                </div>
+                <button type="button" id="leave-balance-load-btn" style="background-color: #6366f1; color: white; white-space: nowrap;">Carica</button>
+            </div>
+            <div id="leave-balance-rows" style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="leave-balance-row" data-leave-type="ferie" style="display: grid; grid-template-columns: 110px 1fr 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
+                    <strong>Ferie (gg)</strong>
+                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Maturate</label><input type="number" step="0.5" class="lb-entitlement" style="width: 100%;" /></div>
+                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Riporto</label><input type="number" step="0.5" class="lb-carryover" style="width: 100%;" /></div>
+                    <div class="lb-computed" style="color: #374151;"></div>
+                </div>
+                <div class="leave-balance-row" data-leave-type="rol" style="display: grid; grid-template-columns: 110px 1fr 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
+                    <strong>ROL (ore)</strong>
+                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Maturate</label><input type="number" step="0.5" class="lb-entitlement" style="width: 100%;" /></div>
+                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Riporto</label><input type="number" step="0.5" class="lb-carryover" style="width: 100%;" /></div>
+                    <div class="lb-computed" style="color: #374151;"></div>
+                </div>
+                <div class="leave-balance-row" data-leave-type="permesso" style="display: grid; grid-template-columns: 110px 1fr 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
+                    <strong>Permesso (ore)</strong>
+                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Maturate</label><input type="number" step="0.5" class="lb-entitlement" style="width: 100%;" /></div>
+                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Riporto</label><input type="number" step="0.5" class="lb-carryover" style="width: 100%;" /></div>
+                    <div class="lb-computed" style="color: #374151;"></div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 12px; align-items: center;">
+                <button type="button" id="leave-balance-save-btn" style="background-color: #22c55e; color: white;">Salva monte ore</button>
+                <span id="leave-balance-status" style="font-size: 0.85rem; color: #6b7280;"></span>
+            </div>
         </div>
 
         <div class="panel-box" style="margin-bottom: 0;">
@@ -444,6 +492,8 @@
             computePresenceStatus,
             latestPunchTime,
             rowsToCsv,
+            computeLeaveUsage,
+            computeLeaveProspectus,
         } from './js/utils.js';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -730,6 +780,7 @@
                 loadPendingRequests();
                 loadTodayPresence();
                 initGeofenceMapIfNeeded();
+                populateLeaveBalanceEmployeeSelect().then(loadLeaveBalanceForSelection);
                 return;
             }
             showView(punchView);
@@ -1287,6 +1338,7 @@
 
         async function loadMyEmployeeRequests() {
             if (!currentUser || !employeeRequestsListEl) return;
+            loadLeaveProspectus();
             const { data, error } = await supabase
                 .from("employee_requests")
                 .select("id, request_type, start_date, end_date, note, status, trasferta_scope, travel_hours, total_hours_declared, created_at")
@@ -1325,6 +1377,43 @@
             });
             employeeRequestsListEl.innerHTML =
                 '<div style="font-weight:600;margin-bottom:6px;">Ultime richieste</div>' + lines.join("");
+        }
+
+        const leaveProspectusYearEl = document.getElementById("leave-prospectus-year");
+        const leaveProspectusBodyEl = document.getElementById("leave-prospectus-body");
+
+        /**
+         * Prospetto personale ferie/ROL/permessi per l'anno corrente: monte ore
+         * configurato dall'admin (leave_balances) meno l'usato calcolato dalle
+         * proprie richieste già approvate (computeLeaveUsage/computeLeaveProspectus,
+         * le stesse funzioni pure usate dal pannello admin "Monte ore").
+         */
+        async function loadLeaveProspectus() {
+            if (!currentUser || !leaveProspectusBodyEl) return;
+            const year = new Date().getFullYear();
+            if (leaveProspectusYearEl) leaveProspectusYearEl.textContent = `(${year})`;
+            const [{ data: balances, error: balErr }, { data: requests, error: reqErr }] = await Promise.all([
+                supabase.from("leave_balances").select("leave_type, entitlement_amount, carryover_amount").eq("user_id", currentUser.id).eq("year", year),
+                supabase.from("employee_requests").select("request_type, status, start_date, end_date, total_hours_declared").eq("user_id", currentUser.id),
+            ]);
+            if (balErr || reqErr) {
+                console.error("Prospetto ferie/ROL/permessi:", balErr || reqErr);
+                leaveProspectusBodyEl.innerHTML = '<p class="state-msg state-msg--error">Impossibile caricare il prospetto.</p>';
+                return;
+            }
+            const balanceByType = Object.fromEntries((balances || []).map((b) => [b.leave_type, b]));
+            const labels = { ferie: "Ferie", rol: "ROL", permesso: "Permesso" };
+            const rows = LEAVE_TYPES.map((leaveType) => {
+                const balance = balanceByType[leaveType];
+                const used = computeLeaveUsage(requests || [], leaveType, year);
+                const p = computeLeaveProspectus(balance, used);
+                const unit = leaveType === "ferie" ? "gg" : "ore";
+                return `<div style="display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #e5e7eb;padding:4px 0;">
+                    <strong>${labels[leaveType]}</strong>
+                    <span>Maturato+riporto: ${p.total} ${unit} · Usato: ${p.used} ${unit} · <strong>Residuo: ${p.residual} ${unit}</strong></span>
+                </div>`;
+            });
+            leaveProspectusBodyEl.innerHTML = rows.join("");
         }
 
         /**
@@ -1811,6 +1900,114 @@
             });
         }
 
+        const LEAVE_TYPES = ['ferie', 'rol', 'permesso'];
+        const leaveBalanceEmployeeSelect = document.getElementById("leave-balance-employee-select");
+        const leaveBalanceYearInput = document.getElementById("leave-balance-year-input");
+        const leaveBalanceLoadBtn = document.getElementById("leave-balance-load-btn");
+        const leaveBalanceSaveBtn = document.getElementById("leave-balance-save-btn");
+        const leaveBalanceStatusEl = document.getElementById("leave-balance-status");
+
+        /** Popola il selettore dipendente del pannello "Monte ore" (solo admin). */
+        async function populateLeaveBalanceEmployeeSelect() {
+            if (!isAdmin || !leaveBalanceEmployeeSelect) return;
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name, email')
+                .order('last_name', { ascending: true });
+            if (error) {
+                console.error("ERRORE CARICAMENTO DIPENDENTI (monte ore):", error);
+                return;
+            }
+            const previousValue = leaveBalanceEmployeeSelect.value;
+            leaveBalanceEmployeeSelect.innerHTML = (data || [])
+                .map(p => `<option value="${p.id}">${p.first_name || ''} ${p.last_name || ''} (${p.email})</option>`)
+                .join('');
+            if (previousValue && (data || []).some(p => p.id === previousValue)) {
+                leaveBalanceEmployeeSelect.value = previousValue;
+            }
+        }
+
+        function setLeaveBalanceRow(leaveType, entitlement, carryover, usedText) {
+            const row = document.querySelector(`.leave-balance-row[data-leave-type="${leaveType}"]`);
+            if (!row) return;
+            row.querySelector('.lb-entitlement').value = entitlement != null ? entitlement : '';
+            row.querySelector('.lb-carryover').value = carryover != null ? carryover : '';
+            row.querySelector('.lb-computed').textContent = usedText || '';
+        }
+
+        /** Carica monte ore + calcola usato/residuo dalle richieste già approvate. */
+        async function loadLeaveBalanceForSelection() {
+            if (!isAdmin) return;
+            const userId = leaveBalanceEmployeeSelect.value;
+            const year = parseInt(leaveBalanceYearInput.value, 10);
+            if (!userId || !Number.isFinite(year)) return;
+            leaveBalanceStatusEl.textContent = "Caricamento...";
+            const [{ data: balances, error: balErr }, { data: requests, error: reqErr }] = await Promise.all([
+                supabase.from('leave_balances').select('leave_type, entitlement_amount, carryover_amount').eq('user_id', userId).eq('year', year),
+                supabase.from('employee_requests').select('request_type, status, start_date, end_date, total_hours_declared').eq('user_id', userId),
+            ]);
+            if (balErr || reqErr) {
+                console.error("ERRORE CARICAMENTO MONTE ORE:", balErr || reqErr);
+                leaveBalanceStatusEl.textContent = `Errore: ${(balErr || reqErr).message}`;
+                return;
+            }
+            const balanceByType = Object.fromEntries((balances || []).map(b => [b.leave_type, b]));
+            for (const leaveType of LEAVE_TYPES) {
+                const balance = balanceByType[leaveType];
+                const used = computeLeaveUsage(
+                    (requests || []).map(r => ({ ...r, request_type: r.request_type })),
+                    leaveType,
+                    year
+                );
+                const p = computeLeaveProspectus(balance, used);
+                const unit = leaveType === 'ferie' ? 'gg' : 'ore';
+                setLeaveBalanceRow(
+                    leaveType,
+                    balance ? balance.entitlement_amount : null,
+                    balance ? balance.carryover_amount : null,
+                    `Usato: ${used} ${unit} — Residuo: ${p.residual} ${unit}`
+                );
+            }
+            leaveBalanceStatusEl.textContent = "";
+        }
+
+        /** Salva (upsert) il monte ore per i tre tipi, poi ricalcola usato/residuo. */
+        async function saveLeaveBalanceForSelection() {
+            if (!isAdmin) return;
+            const userId = leaveBalanceEmployeeSelect.value;
+            const year = parseInt(leaveBalanceYearInput.value, 10);
+            if (!userId || !Number.isFinite(year)) {
+                leaveBalanceStatusEl.textContent = "Seleziona dipendente e anno.";
+                return;
+            }
+            const rows = LEAVE_TYPES.map(leaveType => {
+                const row = document.querySelector(`.leave-balance-row[data-leave-type="${leaveType}"]`);
+                const entitlement = parseFloat(row.querySelector('.lb-entitlement').value);
+                const carryover = parseFloat(row.querySelector('.lb-carryover').value);
+                return {
+                    user_id: userId,
+                    year,
+                    leave_type: leaveType,
+                    entitlement_amount: Number.isFinite(entitlement) ? entitlement : 0,
+                    carryover_amount: Number.isFinite(carryover) ? carryover : 0,
+                    updated_by: currentUser.id,
+                };
+            });
+            leaveBalanceStatusEl.textContent = "Salvataggio...";
+            const { error } = await supabase.from('leave_balances').upsert(rows, { onConflict: 'user_id,year,leave_type' });
+            if (error) {
+                console.error("ERRORE SALVATAGGIO MONTE ORE:", error);
+                leaveBalanceStatusEl.textContent = `Errore: ${error.message}`;
+                return;
+            }
+            leaveBalanceStatusEl.textContent = "Salvato.";
+            await loadLeaveBalanceForSelection();
+        }
+
+        if (leaveBalanceYearInput) leaveBalanceYearInput.value = new Date().getFullYear();
+        if (leaveBalanceLoadBtn) leaveBalanceLoadBtn.addEventListener("click", loadLeaveBalanceForSelection);
+        if (leaveBalanceSaveBtn) leaveBalanceSaveBtn.addEventListener("click", saveLeaveBalanceForSelection);
+
         /**
          * Richieste malattia/trasferta/ferie in attesa di una decisione (stato
          * "saved" o "pending") di TUTTI i dipendenti, con nome/email per contesto.
@@ -1944,6 +2141,8 @@
                 } else if (req.request_type === 'ferie') {
                     const days = countBusinessDays(req.start_date, req.end_date);
                     if (days > 0) extra = ` — ${days} giorni lavorativi`;
+                } else if (req.request_type === 'rol' && Number.isFinite(req.total_hours_declared)) {
+                    extra = ` — ${req.total_hours_declared} ore`;
                 }
                 const note = req.note
                     ? `<div style="font-size:0.8rem;color:#6b7280;margin-top:2px;">${String(req.note).slice(0, 150)}</div>`
@@ -2248,6 +2447,7 @@
                 loadPendingRequests();
                 loadTodayPresence();
                 initGeofenceMapIfNeeded();
+                populateLeaveBalanceEmployeeSelect().then(loadLeaveBalanceForSelection);
             } else {
                 currentHistoryUserId = null;
                 historyTitlePrefixEl.textContent = "Storico Timbrature";
@@ -2468,6 +2668,7 @@
 
             addEmployeeForm.reset();
             await loadAllProfiles();
+            await populateLeaveBalanceEmployeeSelect();
         });
 
         // 🔹 Reset password reale via email (da UID o email)
