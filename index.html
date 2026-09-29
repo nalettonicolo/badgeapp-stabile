@@ -975,6 +975,39 @@
             }
         }
 
+        const GEOFENCE_TRANSITION_STORAGE_KEY = "badgeapp_geofence_transition_state";
+
+        /**
+         * Ultimo stato "dentro/fuori" noto per OGGI, persistito in localStorage
+         * invece che in una semplice variabile in memoria: una variabile si
+         * azzera ogni volta che iOS Safari sospende il JavaScript in background
+         * e il watch riparte da zero al rientro in foreground, perdendo la
+         * base "ero fuori" da cui rilevare la transizione. localStorage
+         * sopravvive sia alla sospensione in background sia alla chiusura
+         * completa dell'app, quindi la transizione resta rilevabile anche tra
+         * una sessione e l'altra dello stesso giorno.
+         */
+        function loadGeofenceTransitionState() {
+            try {
+                const raw = localStorage.getItem(GEOFENCE_TRANSITION_STORAGE_KEY);
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                return parsed && parsed.date === getTodayDateString() ? parsed : null;
+            } catch {
+                return null;
+            }
+        }
+
+        function saveGeofenceTransitionState(wasInside) {
+            try {
+                localStorage.setItem(GEOFENCE_TRANSITION_STORAGE_KEY, JSON.stringify({ date: getTodayDateString(), wasInside }));
+            } catch {
+                // localStorage non disponibile (es. Safari in modalità privata):
+                // la rilevazione della transizione degrada a "nessuna base nota",
+                // non deve mai bloccare il resto dell'app.
+            }
+        }
+
         async function startGeoAutoPunchWatch() {
             if (!("geolocation" in navigator)) {
                 showMessage("Questo browser non supporta la geolocalizzazione.", true);
@@ -994,18 +1027,18 @@
                     const maxAcc = Number.isFinite(settings.max_accuracy_meters) ? settings.max_accuracy_meters : 60;
                     if (Number.isFinite(accuracy) && accuracy > maxAcc) return; // lettura troppo imprecisa: ignorata, niente cambio di stato
                     const insideNow = isInsideGeofence(latitude, longitude, settings);
-                    // Tenta ad OGNI rilevamento "dentro", non solo sulla transizione
-                    // fuori→dentro (bug reale, corretto qui): su iOS Safari sospende
-                    // la pagina in background e il watch riparte da zero ogni volta
-                    // che l'app viene riaperta — il caso più comune è proprio "sono
-                    // già in sede quando riapro l'app", che con la sola transizione
-                    // non veniva mai rilevato (nessuno stato "fuori" precedente da
-                    // cui transitare). attemptAutoMorningPunch() è già idempotente
-                    // (verifica fresca su Supabase prima di scrivere), quindi
-                    // richiamarla ad ogni lettura "dentro" è sicuro.
-                    if (insideNow === true) {
+                    // Timbra SOLO sulla transizione vera fuori→dentro (scelta
+                    // esplicita: mai sulla semplice "sono dentro adesso" senza una
+                    // base "ero fuori" nota). La base è letta da localStorage,
+                    // non da una variabile in memoria, così sopravvive sia alla
+                    // sospensione in background di iOS Safari sia alla chiusura
+                    // completa dell'app durante la stessa giornata.
+                    const previousState = loadGeofenceTransitionState();
+                    const wasInside = previousState ? previousState.wasInside : null;
+                    if (wasInside === false && insideNow === true) {
                         attemptAutoMorningPunch();
                     }
+                    saveGeofenceTransitionState(insideNow);
                     if (geoAutoPunchStatusEl) {
                         geoAutoPunchStatusEl.textContent = insideNow
                             ? "Sei nell'area: se manca l'ingresso mattutino verrà timbrato a breve."

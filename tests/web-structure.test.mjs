@@ -138,14 +138,19 @@ test('la timbratura automatica per posizione tocca solo il campo di ingresso mat
   assert.match(js, /punchSteps\[0\]\.field/);
 });
 
-test('la timbratura automatica tenta ad ogni lettura "dentro l\'area", non solo sulla transizione fuori→dentro', () => {
-  // Bug reale (corretto): su iOS Safari sospende la pagina in background e il
-  // watch riparte da zero al rientro in foreground — chi è GIÀ in sede quando
-  // riapre l'app non veniva mai rilevato da una logica basata solo sulla
-  // transizione (nessuno stato "fuori" precedente da cui transitare).
+test('la timbratura automatica scatta SOLO sulla transizione vera fuori→dentro, con base persistita in localStorage (non in una variabile in memoria)', () => {
+  // Scelta esplicita dell'utente: mai timbrare sulla semplice "sono dentro
+  // adesso" senza una base "ero fuori" nota. Per restare comunque robusta a
+  // iOS Safari (che sospende il JS in background e farebbe perdere una
+  // semplice variabile in memoria), la base "ero fuori/dentro" è letta e
+  // scritta su localStorage, che sopravvive sia alla sospensione in
+  // background sia alla chiusura completa dell'app nella stessa giornata.
   const js = extractInlineModuleScript();
-  assert.match(js, /if\s*\(\s*insideNow\s*===\s*true\s*\)\s*\{\s*attemptAutoMorningPunch\(\);/);
-  assert.doesNotMatch(js, /wasInsideGeofence/);
+  assert.match(js, /function loadGeofenceTransitionState/);
+  assert.match(js, /function saveGeofenceTransitionState/);
+  assert.match(js, /localStorage\.getItem\(GEOFENCE_TRANSITION_STORAGE_KEY\)/);
+  assert.match(js, /localStorage\.setItem\(GEOFENCE_TRANSITION_STORAGE_KEY/);
+  assert.match(js, /if\s*\(\s*wasInside\s*===\s*false\s*&&\s*insideNow\s*===\s*true\s*\)\s*\{\s*attemptAutoMorningPunch\(\);/);
 });
 
 test('il flusso di approvazione richieste esiste ed esclude le rifiutate dal calendario', () => {
