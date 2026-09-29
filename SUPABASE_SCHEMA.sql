@@ -1016,6 +1016,24 @@ BEGIN
         AND ((storage.foldername(name))[1] = auth.uid()::text OR public.is_admin(auth.uid()))
       );
   END IF;
+
+  -- UPDATE serve a upload(..., { upsert: true }): senza questa policy,
+  -- ricaricare un file già esistente per lo stesso mese fallisce per RLS.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'payslips_update_own_or_admin'
+  ) THEN
+    CREATE POLICY payslips_update_own_or_admin
+      ON storage.objects FOR UPDATE TO authenticated
+      USING (
+        bucket_id = 'payslips'
+        AND ((storage.foldername(name))[1] = auth.uid()::text OR public.is_admin(auth.uid()))
+      )
+      WITH CHECK (
+        bucket_id = 'payslips'
+        AND ((storage.foldername(name))[1] = auth.uid()::text OR public.is_admin(auth.uid()))
+      );
+  END IF;
 END
 $$;
 

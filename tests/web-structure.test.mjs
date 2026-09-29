@@ -200,6 +200,23 @@ test('prospetto ferie/ROL/permessi lato dipendente usa le funzioni pure computeL
   assert.match(js, /computeLeaveProspectus\(balance, used\)/);
 });
 
+test('upload busta paga: file su Storage privato, ore dichiarate confrontate con quelle calcolate dall\'app, OCR degrada senza bloccare', () => {
+  for (const id of ['payslip-month-select', 'payslip-file-input', 'payslip-upload-btn', 'payslip-ocr-btn', 'payslip-save-declared-btn']) {
+    assert.ok(html.includes(`id="${id}"`), `manca #${id}`);
+  }
+  for (const type of ['ferie', 'rol', 'permesso']) {
+    assert.ok(html.includes(`data-leave-type="${type}"`) && html.match(new RegExp(`payslip-declared-row[^>]*data-leave-type="${type}"`)), `manca la riga confronto busta paga per "${type}"`);
+  }
+  const js = extractInlineModuleScript();
+  assert.match(js, /async function uploadPayslipFile/);
+  assert.match(js, /supabase\.storage\.from\(["']payslips["']\)\.upload\(/);
+  assert.match(js, /supabase\.from\(["']payslip_documents["']\)\.upsert\(/);
+  assert.match(js, /async function computeMonthlyLeaveAmount|function computeMonthlyLeaveAmount/);
+  // L'OCR è opzionale: un errore/funzione non deployata non deve bloccare l'inserimento manuale.
+  assert.match(js, /async function requestPayslipOcr/);
+  assert.match(js, /catch\s*\(err\)\s*\{\s*console\.warn\(["']OCR busta paga non disponibile/);
+});
+
 test('ROL è una categoria di richiesta separata da permesso, con pulsanti, campo ore e colore propri', () => {
   for (const id of ['req-rol-head', 'req-rol-btn', 'req-rol-fields', 'req-rol-hours']) {
     assert.ok(html.includes(`id="${id}"`), `manca #${id}`);

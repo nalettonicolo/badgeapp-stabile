@@ -161,6 +161,43 @@
                     <p class="state-msg">Caricamento...</p>
                 </div>
             </div>
+            <div id="payslip-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
+                <p style="font-weight: 700; margin: 0 0 0.25rem 0; color: #374151; font-size: 0.95rem;">Busta paga: carica e confronta ore</p>
+                <p style="font-size: 0.78rem; color: #6b7280; margin: 0 0 0.5rem 0; line-height: 1.4;">
+                    Carica il PDF o la foto della busta paga del mese, inserisci le ore di ferie/ROL/permesso dichiarate e confrontale con quelle calcolate dall'app dalle tue richieste già approvate.
+                </p>
+                <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center;">
+                    <select id="payslip-month-select" style="min-width: 160px;"></select>
+                    <input type="file" id="payslip-file-input" accept="application/pdf,image/*" style="flex: 1; min-width: 180px;" />
+                    <button type="button" id="payslip-upload-btn" style="background-color: #2563eb; color: white; white-space: nowrap;">Carica file</button>
+                </div>
+                <p id="payslip-file-status" style="font-size: 0.78rem; color: #6b7280; margin: 0 0 10px 0;"></p>
+                <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center;">
+                    <button type="button" id="payslip-ocr-btn" style="background-color: #7c3aed; color: white; white-space: nowrap;">Leggi automaticamente (OCR)</button>
+                    <span id="payslip-ocr-status" style="font-size: 0.78rem; color: #6b7280;"></span>
+                </div>
+                <div id="payslip-declared-rows" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;">
+                    <div class="payslip-declared-row" data-leave-type="ferie" style="display: grid; grid-template-columns: 110px 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
+                        <strong>Ferie</strong>
+                        <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Ore dichiarate in busta</label><input type="number" step="0.5" class="payslip-declared-hours" style="width: 100%;" /></div>
+                        <div class="payslip-computed" style="color: #374151;"></div>
+                    </div>
+                    <div class="payslip-declared-row" data-leave-type="rol" style="display: grid; grid-template-columns: 110px 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
+                        <strong>ROL</strong>
+                        <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Ore dichiarate in busta</label><input type="number" step="0.5" class="payslip-declared-hours" style="width: 100%;" /></div>
+                        <div class="payslip-computed" style="color: #374151;"></div>
+                    </div>
+                    <div class="payslip-declared-row" data-leave-type="permesso" style="display: grid; grid-template-columns: 110px 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
+                        <strong>Permesso</strong>
+                        <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Ore dichiarate in busta</label><input type="number" step="0.5" class="payslip-declared-hours" style="width: 100%;" /></div>
+                        <div class="payslip-computed" style="color: #374151;"></div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button type="button" id="payslip-save-declared-btn" style="background-color: #22c55e; color: white;">Salva confronto</button>
+                    <span id="payslip-declared-status" style="font-size: 0.85rem; color: #6b7280;"></span>
+                </div>
+            </div>
             <div id="geo-autopunch-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <input type="checkbox" id="geo-autopunch-toggle" style="width: auto;" />
@@ -1339,6 +1376,7 @@
         async function loadMyEmployeeRequests() {
             if (!currentUser || !employeeRequestsListEl) return;
             loadLeaveProspectus();
+            loadPayslipForMonth();
             const { data, error } = await supabase
                 .from("employee_requests")
                 .select("id, request_type, start_date, end_date, note, status, trasferta_scope, travel_hours, total_hours_declared, created_at")
@@ -1415,6 +1453,218 @@
             });
             leaveProspectusBodyEl.innerHTML = rows.join("");
         }
+
+        // -----------------------------------------------------------------------
+        // Busta paga: upload PDF/foto, lettura OCR opzionale, confronto ore
+        // dichiarate vs ore/giorni calcolati dall'app dalle richieste approvate.
+        // -----------------------------------------------------------------------
+        const payslipMonthSelect = document.getElementById("payslip-month-select");
+        const payslipFileInput = document.getElementById("payslip-file-input");
+        const payslipUploadBtn = document.getElementById("payslip-upload-btn");
+        const payslipFileStatusEl = document.getElementById("payslip-file-status");
+        const payslipOcrBtn = document.getElementById("payslip-ocr-btn");
+        const payslipOcrStatusEl = document.getElementById("payslip-ocr-status");
+        const payslipSaveDeclaredBtn = document.getElementById("payslip-save-declared-btn");
+        const payslipDeclaredStatusEl = document.getElementById("payslip-declared-status");
+        let currentPayslipDocument = null;
+
+        function populatePayslipMonthSelect() {
+            if (!payslipMonthSelect) return;
+            const today = new Date();
+            payslipMonthSelect.innerHTML = "";
+            for (let i = 0; i < 12; i++) {
+                const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+                const label = date.toLocaleDateString("it-IT", { year: "numeric", month: "long" });
+                const option = document.createElement("option");
+                option.value = value;
+                option.textContent = label.charAt(0).toUpperCase() + label.slice(1);
+                payslipMonthSelect.appendChild(option);
+            }
+        }
+
+        /** Ritaglia [startDate, endDate] al mese year/month; null se non si sovrappongono. */
+        function clipRangeToMonth(startDate, endDate, year, month) {
+            const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
+            const lastDay = new Date(year, month, 0).getDate();
+            const monthEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+            const lo = startDate > monthStart ? startDate : monthStart;
+            const hi = endDate < monthEnd ? endDate : monthEnd;
+            if (lo > hi) return null;
+            return [lo, hi];
+        }
+
+        /**
+         * Ferie: giorni lavorativi dalle richieste approvate che si sovrappongono
+         * al mese (ritagliate al mese). ROL/permesso: ore dichiarate delle
+         * richieste approvate che iniziano in quel mese (stessa convenzione di
+         * computeLeaveUsage, qui applicata al singolo mese anziché all'anno).
+         */
+        function computeMonthlyLeaveAmount(requests, leaveType, year, month) {
+            const approved = (requests || []).filter((r) => r && r.request_type === leaveType && r.status === "approved");
+            if (leaveType === "ferie") {
+                return approved.reduce((sum, r) => {
+                    const clipped = clipRangeToMonth(r.start_date, r.end_date, year, month);
+                    return clipped ? sum + countBusinessDays(clipped[0], clipped[1]) : sum;
+                }, 0);
+            }
+            const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+            return approved
+                .filter((r) => r.start_date && r.start_date.slice(0, 7) === monthKey)
+                .reduce((sum, r) => sum + (Number.isFinite(r.total_hours_declared) ? r.total_hours_declared : 0), 0);
+        }
+
+        function setPayslipDeclaredRow(leaveType, declaredHours, computedText) {
+            const row = document.querySelector(`.payslip-declared-row[data-leave-type="${leaveType}"]`);
+            if (!row) return;
+            row.querySelector(".payslip-declared-hours").value = declaredHours != null ? declaredHours : "";
+            row.querySelector(".payslip-computed").textContent = computedText || "";
+        }
+
+        function parseSelectedPayslipMonth() {
+            const value = payslipMonthSelect ? payslipMonthSelect.value : "";
+            const [year, month] = value.split("-").map((n) => parseInt(n, 10));
+            return { year, month };
+        }
+
+        /** Carica documento busta paga + calcola il confronto per il mese selezionato. */
+        async function loadPayslipForMonth() {
+            if (!currentUser || !payslipMonthSelect) return;
+            const { year, month } = parseSelectedPayslipMonth();
+            if (!Number.isFinite(year) || !Number.isFinite(month)) return;
+            const [{ data: doc, error: docErr }, { data: requests, error: reqErr }] = await Promise.all([
+                supabase.from("payslip_documents").select("*").eq("user_id", currentUser.id).eq("year", year).eq("month", month).maybeSingle(),
+                supabase.from("employee_requests").select("request_type, status, start_date, end_date, total_hours_declared").eq("user_id", currentUser.id),
+            ]);
+            if (docErr || reqErr) {
+                console.error("Busta paga:", docErr || reqErr);
+                if (payslipFileStatusEl) payslipFileStatusEl.textContent = `Errore: ${(docErr || reqErr).message}`;
+                return;
+            }
+            currentPayslipDocument = doc || null;
+            if (payslipFileStatusEl) {
+                payslipFileStatusEl.textContent = doc
+                    ? `File caricato (${doc.ocr_status === "completato" ? "letto via OCR" : doc.ocr_status === "in_corso" ? "OCR in corso" : doc.ocr_status === "fallito" ? "OCR non riuscito" : "in attesa di OCR/inserimento manuale"}${doc.verified ? ", confermato" : ""}).`
+                    : "Nessun file caricato per questo mese.";
+            }
+            const labels = { ferie: "giorni lav.", rol: "ore", permesso: "ore" };
+            for (const leaveType of LEAVE_TYPES) {
+                const declaredField = `${leaveType}_ore_dichiarate`;
+                const computed = computeMonthlyLeaveAmount(requests || [], leaveType, year, month);
+                setPayslipDeclaredRow(
+                    leaveType,
+                    doc ? doc[declaredField] : null,
+                    `App: ${computed} ${labels[leaveType]}`
+                );
+            }
+        }
+
+        /** Carica il file su Storage (bucket privato "payslips") e upserta la riga. */
+        async function uploadPayslipFile() {
+            if (!currentUser) return;
+            const file = payslipFileInput.files && payslipFileInput.files[0];
+            if (!file) {
+                if (payslipFileStatusEl) payslipFileStatusEl.textContent = "Seleziona prima un file (PDF o foto).";
+                return;
+            }
+            const { year, month } = parseSelectedPayslipMonth();
+            if (!Number.isFinite(year) || !Number.isFinite(month)) return;
+            const ext = (file.name.split(".").pop() || "bin").toLowerCase();
+            const path = `${currentUser.id}/${year}-${String(month).padStart(2, "0")}.${ext}`;
+            if (payslipFileStatusEl) payslipFileStatusEl.textContent = "Caricamento...";
+            const { error: uploadError } = await supabase.storage.from("payslips").upload(path, file, { upsert: true, contentType: file.type || undefined });
+            if (uploadError) {
+                console.error("Upload busta paga:", uploadError);
+                if (payslipFileStatusEl) payslipFileStatusEl.textContent = `Errore upload: ${uploadError.message}`;
+                return;
+            }
+            const { error: upsertError } = await supabase.from("payslip_documents").upsert(
+                {
+                    user_id: currentUser.id,
+                    year,
+                    month,
+                    file_path: path,
+                    file_mime: file.type || null,
+                    ocr_status: "non_richiesto",
+                    uploaded_by: currentUser.id,
+                },
+                { onConflict: "user_id,year,month" }
+            );
+            if (upsertError) {
+                console.error("Salvataggio busta paga:", upsertError);
+                if (payslipFileStatusEl) payslipFileStatusEl.textContent = `Errore salvataggio: ${upsertError.message}`;
+                return;
+            }
+            payslipFileInput.value = "";
+            await loadPayslipForMonth();
+        }
+
+        /**
+         * Lettura automatica (OCR) tramite Edge Function: richiede una chiave
+         * esterna configurata dall'amministratore Supabase (vedi
+         * OPERATIONS_TODO.md). Se la funzione non è ancora configurata,
+         * degrada senza errori bloccanti: resta sempre possibile l'inserimento
+         * manuale delle ore qui sotto.
+         */
+        async function requestPayslipOcr() {
+            if (!currentPayslipDocument) {
+                if (payslipOcrStatusEl) payslipOcrStatusEl.textContent = "Carica prima il file della busta paga.";
+                return;
+            }
+            if (payslipOcrStatusEl) payslipOcrStatusEl.textContent = "Lettura in corso...";
+            try {
+                const { data, error } = await supabase.functions.invoke("ocr-payslip", {
+                    body: { documentId: currentPayslipDocument.id },
+                });
+                if (error) throw error;
+                if (data) {
+                    if (data.ferie_ore_dichiarate != null) setPayslipDeclaredRowValue("ferie", data.ferie_ore_dichiarate);
+                    if (data.rol_ore_dichiarate != null) setPayslipDeclaredRowValue("rol", data.rol_ore_dichiarate);
+                    if (data.permesso_ore_dichiarate != null) setPayslipDeclaredRowValue("permesso", data.permesso_ore_dichiarate);
+                }
+                if (payslipOcrStatusEl) payslipOcrStatusEl.textContent = "Lettura completata: controlla i valori e premi «Salva confronto».";
+                await loadPayslipForMonth();
+            } catch (err) {
+                console.warn("OCR busta paga non disponibile:", err);
+                if (payslipOcrStatusEl) payslipOcrStatusEl.textContent = "OCR non disponibile al momento: inserisci le ore manualmente qui sotto.";
+            }
+        }
+
+        function setPayslipDeclaredRowValue(leaveType, value) {
+            const row = document.querySelector(`.payslip-declared-row[data-leave-type="${leaveType}"]`);
+            if (row) row.querySelector(".payslip-declared-hours").value = value;
+        }
+
+        /** Salva le ore dichiarate (manuali o rivisto dopo OCR) e segna il documento come verificato da un umano. */
+        async function savePayslipDeclaredHours() {
+            if (!currentUser) return;
+            if (!currentPayslipDocument) {
+                if (payslipDeclaredStatusEl) payslipDeclaredStatusEl.textContent = "Carica prima il file della busta paga.";
+                return;
+            }
+            const { year, month } = parseSelectedPayslipMonth();
+            const payload = { user_id: currentUser.id, year, month, file_path: currentPayslipDocument.file_path, verified: true, uploaded_by: currentUser.id };
+            for (const leaveType of LEAVE_TYPES) {
+                const row = document.querySelector(`.payslip-declared-row[data-leave-type="${leaveType}"]`);
+                const value = parseFloat(row.querySelector(".payslip-declared-hours").value);
+                payload[`${leaveType}_ore_dichiarate`] = Number.isFinite(value) ? value : null;
+            }
+            if (payslipDeclaredStatusEl) payslipDeclaredStatusEl.textContent = "Salvataggio...";
+            const { error } = await supabase.from("payslip_documents").upsert(payload, { onConflict: "user_id,year,month" });
+            if (error) {
+                console.error("Salvataggio confronto busta paga:", error);
+                if (payslipDeclaredStatusEl) payslipDeclaredStatusEl.textContent = `Errore: ${error.message}`;
+                return;
+            }
+            if (payslipDeclaredStatusEl) payslipDeclaredStatusEl.textContent = "Salvato.";
+            await loadPayslipForMonth();
+        }
+
+        populatePayslipMonthSelect();
+        if (payslipMonthSelect) payslipMonthSelect.addEventListener("change", loadPayslipForMonth);
+        if (payslipUploadBtn) payslipUploadBtn.addEventListener("click", uploadPayslipFile);
+        if (payslipOcrBtn) payslipOcrBtn.addEventListener("click", requestPayslipOcr);
+        if (payslipSaveDeclaredBtn) payslipSaveDeclaredBtn.addEventListener("click", savePayslipDeclaredHours);
 
         /**
          * Funzione principale per inserire/aggiornare la timbratura nel DB.
