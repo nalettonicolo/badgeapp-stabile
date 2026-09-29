@@ -25,6 +25,22 @@ che l'agente non ha. Vanno fatti a mano dal proprietario del progetto.
   un ping preventivo: se il progetto va comunque in pausa, va riattivato a
   mano dalla dashboard.
 
+## Supabase → Edge Functions → Secrets
+
+- [ ] **ANTHROPIC_API_KEY per la lettura automatica (OCR) delle buste paga**:
+  la Edge Function `ocr-payslip` (già distribuita, `supabase/functions/ocr-payslip/index.ts`)
+  legge il PDF/foto caricato in Storage e chiede a un modello Claude di
+  estrarre le ore di ferie/ROL/permesso dichiarate. Serve una API key
+  Anthropic come secret del progetto Supabase — l'agente non può crearla
+  (richiede un account su https://console.anthropic.com). Impostarla da:
+  https://supabase.com/dashboard/project/pobrjdrqpzerjlcqnpra/functions/secrets
+  (nome esatto: `ANTHROPIC_API_KEY`), oppure con la CLI:
+  `supabase secrets set ANTHROPIC_API_KEY=sk-ant-... --project-ref pobrjdrqpzerjlcqnpra`.
+  Senza questo secret il pulsante "Leggi automaticamente (OCR)" nell'app
+  risponde con un messaggio esplicito e **non blocca nulla**: l'inserimento
+  manuale delle ore dichiarate resta sempre disponibile e sufficiente per
+  usare il confronto busta paga.
+
 ## Branding / design (decisione di prodotto, non tecnica)
 
 - [x] **Logo "T" (Timbrature) su icone web (PWA) e mobile**: monogramma

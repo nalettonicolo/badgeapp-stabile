@@ -80,6 +80,42 @@ Vista storico (dipendente e admin):
   BOM, corretto con le lettere accentate italiane).
 
 --------------------------------------------------
+Ferie, ROL, permessi e busta paga
+--------------------------------------------------
+Categorie di richiesta: malattia, trasferta, ferie (giorni lavorativi) e ROL
+(ore, categoria separata da permesso, come da richiesta). "Permesso" esiste
+già come tipo dati ma non ha ancora un pulsante dedicato nella UI.
+
+Pannello admin → "Monte ore ferie/ROL/permessi":
+- Per ogni dipendente e anno: ore/giorni maturati da contratto + eventuale
+  riporto dall'anno precedente (tabella leave_balances, RLS admin-only in
+  scrittura). Nessun valore CCNL precompilato: è tutto configurabile per
+  dipendente, come richiesto.
+- Residuo = maturato + riporto − usato, con "usato" calcolato dalle richieste
+  già approvate (stesse funzioni pure js/utils.js#computeLeaveUsage /
+  computeLeaveProspectus, testate in tests/utils.test.mjs).
+
+Vista dipendente (schermata timbrature):
+- "Prospetto ferie, ROL e permessi": stesso calcolo lato personale, per
+  l'anno corrente.
+- "Busta paga: carica e confronta ore": upload PDF/foto nel bucket Storage
+  privato `payslips` (path `<user_id>/<anno>-<mese>.<ext>`, RLS: proprietario
+  o admin), poi le ore dichiarate per ferie/ROL/permesso — inserite a mano o
+  lette con "Leggi automaticamente (OCR)" — confrontate con quanto calcolato
+  dall'app dalle richieste approvate in quel mese.
+
+OCR busta paga (opzionale, richiede setup manuale):
+- Edge Function `supabase/functions/ocr-payslip/index.ts`, già distribuita
+  sul progetto. Chiede a un modello Claude con vision di leggere il
+  documento ed estrarre i tre valori.
+- Richiede il secret `ANTHROPIC_API_KEY` sul progetto Supabase — vedi
+  OPERATIONS_TODO.md. Senza quel secret il pulsante OCR risponde con un
+  messaggio esplicito e **non blocca nulla**: l'inserimento manuale resta
+  sempre disponibile.
+- L'OCR non conferma mai da solo i valori (`verified` resta `false`): un
+  umano deve sempre rivedere e premere "Salva confronto" prima che contino.
+
+--------------------------------------------------
 Workaround standby Supabase (Free)
 --------------------------------------------------
 Workflow già pronto nel repository (gira automaticamente ogni 2 giorni):
