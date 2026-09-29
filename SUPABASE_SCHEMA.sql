@@ -822,6 +822,203 @@ CREATE POLICY geofence_insert_admin
 
 COMMENT ON TABLE public.geofence_settings IS 'Area (poligono disegnato dall''admin) per la timbratura automatica opt-in del solo ingresso mattutino via geolocalizzazione browser.';
 
+-- -----------------------------------------------------------------------------
+-- 14) Ferie / ROL / permessi: monte ore configurabile, categoria ROL, busta paga
+--
+-- Tre pezzi:
+-- a) ROL aggiunto come categoria di richiesta distinta da "permesso" (stesse
+--    colonne già esistenti: start_date/end_date + total_hours_declared per le
+--    ore, esattamente come già usato per trasferta — nessuna nuova colonna).
+-- b) leave_balances: monte ore/giorni ANNUALE configurabile per dipendente
+--    (l'admin lo imposta, non è un valore fisso nel codice: ogni azienda/CCNL
+--    ha numeri diversi). Unità implicita dal tipo: ferie in GIORNI lavorativi
+--    (coerente con countBusinessDays già usato per le richieste ferie),
+--    rol/permesso in ORE.
+-- c) payslip_documents: PDF/foto della busta paga caricata (Supabase Storage,
+--    bucket privato "payslips") + le ore dichiarate per categoria, da
+--    confrontare col prospetto calcolato dall'app (monte ore - ore/giorni
+--    già usati nelle richieste approvate). Le tre colonne *_dichiarate
+--    partono via OCR (edge function, richiede una chiave API esterna
+--    configurata a parte — vedi OPERATIONS_TODO.md) ma restano SEMPRE
+--    modificabili a mano e vanno confermate (colonna verified) prima di
+--    essere trattate come dato buono: l'OCR su un documento di payroll non è
+--    mai attendibile al 100%, specialmente su una foto storta o un formato
+--    non standard.
+-- -----------------------------------------------------------------------------
+
+-- a) ROL come categoria distinta
+ALTER TABLE public.employee_requests DROP CONSTRAINT IF EXISTS employee_requests_request_type_check;
+ALTER TABLE public.employee_requests
+  ADD CONSTRAINT employee_requests_request_type_check
+  CHECK (request_type IN ('trasferta', 'malattia', 'ferie', 'permesso', 'rol'));
+COMMENT ON COLUMN public.employee_requests.request_type IS 'trasferta | malattia | ferie | permesso | rol';
+COMMENT ON COLUMN public.employee_requests.total_hours_declared IS 'Ore totali dichiarate: trasferta (incl. viaggio) o ROL (ore di riduzione orario richieste in questo giorno).';
+
+-- b) Monte ore/giorni annuale per dipendente
+CREATE TABLE IF NOT EXISTS public.leave_balances (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  year integer NOT NULL,
+  leave_type text NOT NULL,
+  entitlement_amount double precision NOT NULL DEFAULT 0,
+  carryover_amount double precision NOT NULL DEFAULT 0,
+  note text,
+  updated_by uuid REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT leave_balances_type_check CHECK (leave_type IN ('ferie', 'rol', 'permesso')),
+  CONSTRAINT leave_balances_year_check CHECK (year BETWEEN 2000 AND 2100),
+  CONSTRAINT leave_balances_entitlement_check CHECK (entitlement_amount >= 0),
+  CONSTRAINT leave_balances_carryover_check CHECK (carryover_amount >= 0),
+  UNIQUE (user_id, year, leave_type)
+);
+COMMENT ON TABLE public.leave_balances IS 'Monte ore/giorni annuale per dipendente, impostato dall''admin: ferie in giorni lavorativi, rol/permesso in ore.';
+COMMENT ON COLUMN public.leave_balances.entitlement_amount IS 'Maturato per l''anno (giorni per ferie, ore per rol/permesso).';
+COMMENT ON COLUMN public.leave_balances.carryover_amount IS 'Residuo riportato dall''anno precedente, stessa unità di entitlement_amount.';
+
+ALTER TABLE public.leave_balances ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'leave_balances' AND policyname = 'leave_balances_select_own_or_admin'
+  ) THEN
+    CREATE POLICY leave_balances_select_own_or_admin
+      ON public.leave_balances FOR SELECT TO authenticated
+      USING (auth.uid() = user_id OR public.is_admin(auth.uid()));
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'leave_balances' AND policyname = 'leave_balances_admin_write'
+  ) THEN
+    CREATE POLICY leave_balances_admin_write
+      ON public.leave_balances FOR ALL TO authenticated
+      USING (public.is_admin(auth.uid()))
+      WITH CHECK (public.is_admin(auth.uid()));
+  END IF;
+END
+$$;
+
+-- c) Busta paga: documento caricato + ore dichiarate per categoria
+CREATE TABLE IF NOT EXISTS public.payslip_documents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  year integer NOT NULL,
+  month integer NOT NULL,
+  file_path text NOT NULL,
+  file_mime text,
+  ferie_ore_dichiarate double precision,
+  rol_ore_dichiarate double precision,
+  permesso_ore_dichiarate double precision,
+  ocr_status text NOT NULL DEFAULT 'non_richiesto',
+  ocr_raw_text text,
+  verified boolean NOT NULL DEFAULT false,
+  uploaded_by uuid NOT NULL REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT payslip_documents_month_check CHECK (month BETWEEN 1 AND 12),
+  CONSTRAINT payslip_documents_year_check CHECK (year BETWEEN 2000 AND 2100),
+  CONSTRAINT payslip_documents_ocr_status_check CHECK (ocr_status IN ('non_richiesto', 'in_corso', 'completato', 'fallito')),
+  CONSTRAINT payslip_documents_ferie_check CHECK (ferie_ore_dichiarate IS NULL OR ferie_ore_dichiarate >= 0),
+  CONSTRAINT payslip_documents_rol_check CHECK (rol_ore_dichiarate IS NULL OR rol_ore_dichiarate >= 0),
+  CONSTRAINT payslip_documents_permesso_check CHECK (permesso_ore_dichiarate IS NULL OR permesso_ore_dichiarate >= 0),
+  UNIQUE (user_id, year, month)
+);
+COMMENT ON TABLE public.payslip_documents IS 'Busta paga caricata (PDF/foto in Storage, bucket payslips) + ore dichiarate per ferie/rol/permesso, da confrontare col prospetto calcolato dall''app.';
+COMMENT ON COLUMN public.payslip_documents.verified IS 'true = numeri (via OCR o inseriti a mano) controllati e confermati da un umano. Mai fidarsi ciecamente dell''OCR su un documento di payroll.';
+
+ALTER TABLE public.payslip_documents ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'payslip_documents' AND policyname = 'payslip_documents_select_own_or_admin'
+  ) THEN
+    CREATE POLICY payslip_documents_select_own_or_admin
+      ON public.payslip_documents FOR SELECT TO authenticated
+      USING (auth.uid() = user_id OR public.is_admin(auth.uid()));
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'payslip_documents' AND policyname = 'payslip_documents_insert_own_or_admin'
+  ) THEN
+    CREATE POLICY payslip_documents_insert_own_or_admin
+      ON public.payslip_documents FOR INSERT TO authenticated
+      WITH CHECK (auth.uid() = user_id OR public.is_admin(auth.uid()));
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'payslip_documents' AND policyname = 'payslip_documents_update_own_or_admin'
+  ) THEN
+    CREATE POLICY payslip_documents_update_own_or_admin
+      ON public.payslip_documents FOR UPDATE TO authenticated
+      USING (auth.uid() = user_id OR public.is_admin(auth.uid()))
+      WITH CHECK (auth.uid() = user_id OR public.is_admin(auth.uid()));
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'payslip_documents' AND policyname = 'payslip_documents_delete_own_or_admin'
+  ) THEN
+    CREATE POLICY payslip_documents_delete_own_or_admin
+      ON public.payslip_documents FOR DELETE TO authenticated
+      USING (auth.uid() = user_id OR public.is_admin(auth.uid()));
+  END IF;
+END
+$$;
+
+-- Storage: bucket privato per i file busta paga, un path per dipendente
+-- (<user_id>/<year>-<month>.<ext>) — niente accesso pubblico, RLS sullo
+-- stesso schema is_admin() usato ovunque nel resto del file.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('payslips', 'payslips', false)
+ON CONFLICT (id) DO NOTHING;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'payslips_insert_own'
+  ) THEN
+    CREATE POLICY payslips_insert_own
+      ON storage.objects FOR INSERT TO authenticated
+      WITH CHECK (
+        bucket_id = 'payslips'
+        AND ((storage.foldername(name))[1] = auth.uid()::text OR public.is_admin(auth.uid()))
+      );
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'payslips_select_own_or_admin'
+  ) THEN
+    CREATE POLICY payslips_select_own_or_admin
+      ON storage.objects FOR SELECT TO authenticated
+      USING (
+        bucket_id = 'payslips'
+        AND ((storage.foldername(name))[1] = auth.uid()::text OR public.is_admin(auth.uid()))
+      );
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'payslips_delete_own_or_admin'
+  ) THEN
+    CREATE POLICY payslips_delete_own_or_admin
+      ON storage.objects FOR DELETE TO authenticated
+      USING (
+        bucket_id = 'payslips'
+        AND ((storage.foldername(name))[1] = auth.uid()::text OR public.is_admin(auth.uid()))
+      );
+  END IF;
+END
+$$;
+
 -- =============================================================================
 -- Fine
 -- =============================================================================

@@ -22,6 +22,8 @@ import {
   computePresenceStatus,
   latestPunchTime,
   rowsToCsv,
+  computeLeaveUsage,
+  computeLeaveProspectus,
 } from '../js/utils.js';
 
 test('isLikelyNetworkError riconosce errori di rete', () => {
@@ -340,5 +342,55 @@ test('latestPunchTime: null/vuoto → null, altrimenti l\'evento più avanzato n
       iniziomattina: '08:00', finemattina: '12:00', iniziopomeriggio: '13:00', finepomeriggio: '17:32',
     }),
     '17:32'
+  );
+});
+
+test('computeLeaveUsage: ferie in giorni lavorativi, solo richieste approvate, clippate all\'anno', () => {
+  const requests = [
+    { request_type: 'ferie', status: 'approved', start_date: '2026-08-03', end_date: '2026-08-07' }, // 5 gg lav.
+    { request_type: 'ferie', status: 'pending', start_date: '2026-09-01', end_date: '2026-09-05' }, // non conta
+    { request_type: 'ferie', status: 'rejected', start_date: '2026-09-01', end_date: '2026-09-05' }, // non conta
+    { request_type: 'malattia', status: 'approved', start_date: '2026-08-10', end_date: '2026-08-10' }, // altro tipo
+  ];
+  assert.equal(computeLeaveUsage(requests, 'ferie', 2026), 5);
+});
+
+test('computeLeaveUsage: ferie a cavallo di due anni, clippata solo alla porzione dell\'anno richiesto', () => {
+  const requests = [
+    { request_type: 'ferie', status: 'approved', start_date: '2026-12-29', end_date: '2027-01-04' },
+  ];
+  // 2026: 29,30,31 dic -> lun-mer (2026-12-29 è martedì) = 3 giorni lavorativi
+  assert.equal(computeLeaveUsage(requests, 'ferie', 2026), 3);
+  // 2027: 1,2,3,4 gen -> ven,sab,dom,lun = 2 giorni lavorativi (1 e 4 gennaio)
+  assert.equal(computeLeaveUsage(requests, 'ferie', 2027), 2);
+});
+
+test('computeLeaveUsage: rol/permesso sommano le ore dichiarate (total_hours_declared) dell\'anno', () => {
+  const requests = [
+    { request_type: 'rol', status: 'approved', start_date: '2026-03-10', end_date: '2026-03-10', total_hours_declared: 4 },
+    { request_type: 'rol', status: 'approved', start_date: '2026-03-15', end_date: '2026-03-15', total_hours_declared: 2 },
+    { request_type: 'rol', status: 'approved', start_date: '2025-12-20', end_date: '2025-12-20', total_hours_declared: 8 }, // altro anno
+    { request_type: 'permesso', status: 'approved', start_date: '2026-03-10', end_date: '2026-03-10', total_hours_declared: 3 },
+  ];
+  assert.equal(computeLeaveUsage(requests, 'rol', 2026), 6);
+  assert.equal(computeLeaveUsage(requests, 'permesso', 2026), 3);
+});
+
+test('computeLeaveUsage: nessuna richiesta / array vuoto → 0', () => {
+  assert.equal(computeLeaveUsage([], 'ferie', 2026), 0);
+  assert.equal(computeLeaveUsage(null, 'rol', 2026), 0);
+});
+
+test('computeLeaveProspectus: maturato + riportato - usato = residuo', () => {
+  assert.deepEqual(
+    computeLeaveProspectus({ entitlement_amount: 26, carryover_amount: 4 }, 10),
+    { entitlement: 26, carryover: 4, total: 30, used: 10, residual: 20 }
+  );
+});
+
+test('computeLeaveProspectus: nessun bilancio impostato → tutto zero, residuo negativo se usato > 0', () => {
+  assert.deepEqual(
+    computeLeaveProspectus(null, 5),
+    { entitlement: 0, carryover: 0, total: 0, used: 5, residual: -5 }
   );
 });

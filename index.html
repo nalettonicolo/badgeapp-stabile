@@ -96,7 +96,7 @@
             "
         >
             <span style="width: 100%; text-align: center; font-size: 0.8rem; font-weight: 600; color: #374151;"
-                >Malattia · Trasferta · Ferie</span
+                >Malattia · Trasferta · Ferie · ROL</span
             >
             <button type="button" id="req-malattia-head" style="background-color: #e11d48; color: white; padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 90px; max-width: 200px;">
                 Malattia
@@ -106,6 +106,9 @@
             </button>
             <button type="button" id="req-ferie-head" style="background-color: #0d9488; color: white; padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 90px; max-width: 200px;">
                 Ferie
+            </button>
+            <button type="button" id="req-rol-head" style="background-color: #7c3aed; color: white; padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 90px; max-width: 200px;">
+                ROL
             </button>
         </div>
 
@@ -143,12 +146,13 @@
                     color: white;">Timbra Manualmente (Solo per Correzioni)</button>
             </div>
             <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
-                <p style="font-weight: 700; margin: 0 0 0.25rem 0; color: #374151; font-size: 0.95rem;">Malattia, trasferta e ferie</p>
+                <p style="font-weight: 700; margin: 0 0 0.25rem 0; color: #374151; font-size: 0.95rem;">Malattia, trasferta, ferie e ROL</p>
                 <p style="font-size: 0.8rem; color: #6b7280; margin: 0 0 0.5rem 0;">Stesso salvataggio dell’app mobile (tabella <code style="font-size: 0.75rem">employee_requests</code>, stato salvato).</p>
                 <div class="absence-buttons">
                     <button type="button" id="req-malattia-btn" style="background-color: #e11d48; color: white;">Malattia</button>
                     <button type="button" id="req-trasferta-btn" style="background-color: #ea580c; color: white;">Trasferta</button>
                     <button type="button" id="req-ferie-btn" style="background-color: #0d9488; color: white;">Ferie</button>
+                    <button type="button" id="req-rol-btn" style="background-color: #7c3aed; color: white;">ROL</button>
                 </div>
             </div>
             <div id="geo-autopunch-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
@@ -400,6 +404,10 @@
                 <div id="req-ferie-hint" class="hidden" style="font-size: 0.85rem; color: #0f766e; background: #f0fdfa; padding: 8px 10px; border-radius: 6px;">
                     Verranno conteggiati i giorni di calendario dal «Dal» al «Al» (inclusi).
                 </div>
+                <div id="req-rol-fields" class="hidden">
+                    <label for="req-rol-hours" style="font-weight: 600;">Ore ROL</label>
+                    <input type="number" id="req-rol-hours" min="0" step="0.5" placeholder="es. 4" />
+                </div>
                 <div>
                     <label for="req-note" style="font-weight: 600;">Note (opzionali)</label>
                     <textarea id="req-note" rows="3" placeholder="Certificato, destinazione, ecc." style="width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; padding: 10px; resize: vertical;"></textarea>
@@ -583,11 +591,14 @@
         const reqTravelHours = document.getElementById("req-travel-hours");
         const reqTotalHoursDeclared = document.getElementById("req-total-hours-declared");
         const reqFerieHint = document.getElementById("req-ferie-hint");
+        const reqRolFields = document.getElementById("req-rol-fields");
+        const reqRolHours = document.getElementById("req-rol-hours");
         const reqNote = document.getElementById("req-note");
         const closeEmployeeRequestModal = document.getElementById("close-employee-request-modal");
         const reqMalattiaBtn = document.getElementById("req-malattia-btn");
         const reqTrasfertaBtn = document.getElementById("req-trasferta-btn");
         const reqFerieBtn = document.getElementById("req-ferie-btn");
+        const reqRolBtn = document.getElementById("req-rol-btn");
         const employeeRequestsListEl = document.getElementById("employee-requests-list");
 
         const recoveryPasswordModal = document.getElementById("recovery-password-modal");
@@ -1196,7 +1207,7 @@
             loadMyEmployeeRequests();
         }
 
-        const REQUEST_TYPE_LABELS = { malattia: "Malattia", trasferta: "Trasferta", ferie: "Ferie" };
+        const REQUEST_TYPE_LABELS = { malattia: "Malattia", trasferta: "Trasferta", ferie: "Ferie", permesso: "Permesso", rol: "ROL" };
         const STATUS_LABELS = { saved: "Salvato", pending: "In attesa", approved: "Approvato", rejected: "Rifiutato" };
 
         /**
@@ -1245,18 +1256,27 @@
             reqTravelHours.value = "";
             if (reqTotalHoursDeclared) reqTotalHoursDeclared.value = "";
             reqTrasfertaScope.value = "TI";
+            if (reqRolHours) reqRolHours.value = "";
             if (type === "trasferta") {
                 employeeRequestModalTitle.textContent = "Registra trasferta";
                 reqTrasfertaFields.classList.remove("hidden");
                 reqFerieHint.classList.add("hidden");
+                if (reqRolFields) reqRolFields.classList.add("hidden");
             } else if (type === "ferie") {
                 employeeRequestModalTitle.textContent = "Registra giorni di ferie";
                 reqTrasfertaFields.classList.add("hidden");
                 reqFerieHint.classList.remove("hidden");
+                if (reqRolFields) reqRolFields.classList.add("hidden");
+            } else if (type === "rol") {
+                employeeRequestModalTitle.textContent = "Registra ore ROL";
+                reqTrasfertaFields.classList.add("hidden");
+                reqFerieHint.classList.add("hidden");
+                if (reqRolFields) reqRolFields.classList.remove("hidden");
             } else {
                 employeeRequestModalTitle.textContent = "Registra malattia";
                 reqTrasfertaFields.classList.add("hidden");
                 reqFerieHint.classList.add("hidden");
+                if (reqRolFields) reqRolFields.classList.add("hidden");
             }
             employeeRequestModal.classList.remove("hidden");
         }
@@ -1532,7 +1552,7 @@
             let totalPositiveExtraMinutes = 0;
 
             // Colori coerenti con i pulsanti malattia/trasferta/ferie del resto dell'app.
-            const REQUEST_TYPE_COLORS = { malattia: '#e11d48', trasferta: '#ea580c', ferie: '#0d9488' };
+            const REQUEST_TYPE_COLORS = { malattia: '#e11d48', trasferta: '#ea580c', ferie: '#0d9488', permesso: '#2563eb', rol: '#7c3aed' };
             const REQUEST_ROW_BG = { saved: '#fef9c3', pending: '#fef9c3', approved: '#dcfce7' };
 
             const punchByDate = {};
@@ -2000,9 +2020,11 @@
                 [reqMalattiaBtn, "malattia"],
                 [reqTrasfertaBtn, "trasferta"],
                 [reqFerieBtn, "ferie"],
+                [reqRolBtn, "rol"],
                 [document.getElementById("req-malattia-head"), "malattia"],
                 [document.getElementById("req-trasferta-head"), "trasferta"],
                 [document.getElementById("req-ferie-head"), "ferie"],
+                [document.getElementById("req-rol-head"), "rol"],
             ];
             for (const [el, type] of pairs) {
                 if (!el) continue;
@@ -2029,6 +2051,13 @@
                 showMessage("Controlla le date: «Al» deve essere uguale o successiva a «Dal».", true);
                 return;
             }
+            if (currentEmployeeRequestType === "rol") {
+                const rh = parseFloat(reqRolHours ? reqRolHours.value : NaN);
+                if (Number.isNaN(rh) || rh <= 0) {
+                    showMessage("Indica le ore ROL (maggiori di zero).", true);
+                    return;
+                }
+            }
             const payload = {
                 user_id: currentUser.id,
                 request_type: currentEmployeeRequestType,
@@ -2043,6 +2072,8 @@
                 if (!Number.isNaN(th) && th >= 0) payload.travel_hours = th;
                 const td = reqTotalHoursDeclared ? parseFloat(reqTotalHoursDeclared.value) : NaN;
                 if (!Number.isNaN(td) && td >= 0) payload.total_hours_declared = td;
+            } else if (currentEmployeeRequestType === "rol") {
+                payload.total_hours_declared = parseFloat(reqRolHours.value);
             }
             const { error } = await supabase.from("employee_requests").insert(payload);
             if (error) {

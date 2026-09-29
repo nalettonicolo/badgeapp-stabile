@@ -287,6 +287,52 @@ export function rowsToCsv(rows) {
     return "﻿" + body;
 }
 
+// -----------------------------------------------------------------------------
+// Ferie / ROL / permessi — prospetto maturato/usato/residuo. "ferie" in
+// GIORNI LAVORATIVI (countBusinessDays, coerente col conteggio già mostrato
+// nelle liste richieste), "rol"/"permesso" in ORE (total_hours_declared,
+// stessa colonna già usata per le ore di trasferta).
+// -----------------------------------------------------------------------------
+
+/**
+ * Ore/giorni di un tipo di assenza consumati da richieste APPROVATE che
+ * ricadono (anche parzialmente) nell'anno indicato. Le richieste in attesa
+ * o rifiutate non contano: non sono ancora (o non sono più) un consumo reale.
+ */
+export function computeLeaveUsage(requests, leaveType, year) {
+    const list = (requests || []).filter(
+        (r) => r && r.request_type === leaveType && r.status === 'approved' && r.start_date && r.end_date
+    );
+    if (leaveType === 'ferie') {
+        const yearStart = `${year}-01-01`;
+        const yearEnd = `${year}-12-31`;
+        return list.reduce((sum, r) => {
+            const lo = r.start_date > yearStart ? r.start_date : yearStart;
+            const hi = r.end_date < yearEnd ? r.end_date : yearEnd;
+            if (lo > hi) return sum;
+            return sum + countBusinessDays(lo, hi);
+        }, 0);
+    }
+    // rol / permesso: ore dichiarate sulla richiesta (di norma un solo giorno).
+    return list
+        .filter((r) => r.start_date.slice(0, 4) === String(year))
+        .reduce((sum, r) => sum + (Number.isFinite(r.total_hours_declared) ? r.total_hours_declared : 0), 0);
+}
+
+/**
+ * Prospetto ferie/ROL/permesso: quanto spetta (maturato + riportato dall'anno
+ * precedente), quanto già usato, quanto resta. Un residuo negativo (più
+ * usato di quanto maturato) resta visibile come tale: è un dato reale da far
+ * notare, non un caso limite da nascondere.
+ */
+export function computeLeaveProspectus(balance, usedAmount) {
+    const entitlement = balance && Number.isFinite(balance.entitlement_amount) ? balance.entitlement_amount : 0;
+    const carryover = balance && Number.isFinite(balance.carryover_amount) ? balance.carryover_amount : 0;
+    const used = Number.isFinite(usedAmount) ? usedAmount : 0;
+    const total = entitlement + carryover;
+    return { entitlement, carryover, total, used, residual: total - used };
+}
+
 /** Orario dell'ultimo evento di timbratura registrato oggi (HH:MM), o null. */
 export function latestPunchTime(punch) {
     if (!punch) return null;

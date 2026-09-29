@@ -176,3 +176,17 @@ test('export CSV storico: bottone presente, esporta la tabella già a schermo (n
   assert.match(js, /rowsToCsv\(rows\)/);
   assert.match(js, /punchesTableContainer\.querySelector\(['"]#punches-table['"]\)/);
 });
+
+test('ROL è una categoria di richiesta separata da permesso, con pulsanti, campo ore e colore propri', () => {
+  for (const id of ['req-rol-head', 'req-rol-btn', 'req-rol-fields', 'req-rol-hours']) {
+    assert.ok(html.includes(`id="${id}"`), `manca #${id}`);
+  }
+  const js = extractInlineModuleScript();
+  // Etichetta e colore dedicati, distinti da malattia/trasferta/ferie/permesso.
+  assert.match(js, /REQUEST_TYPE_LABELS\s*=\s*\{[^}]*\brol:\s*["']ROL["']/);
+  assert.match(js, /REQUEST_TYPE_COLORS\s*=\s*\{[^}]*\brol:\s*['"]#[0-9a-fA-F]{6}['"]/);
+  // Il tipo "rol" apre il modale con il proprio campo ore (non riusa i campi trasferta/ferie).
+  assert.match(js, /type === "rol"/);
+  // Il submit salva le ore ROL dichiarate in total_hours_declared (stessa colonna del prospetto).
+  assert.match(js, /currentEmployeeRequestType === "rol"[\s\S]{0,400}total_hours_declared\s*=\s*parseFloat\(reqRolHours\.value\)/);
+});
