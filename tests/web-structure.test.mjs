@@ -259,6 +259,29 @@ test('upload busta paga: l\'estensione del path Storage è sanificata (niente sl
   assert.match(js, /replace\(\/\[\^a-z0-9\]\/g, ["']["']\)/);
 });
 
+test('storico ferie/ROL/permessi: schermata dedicata con selettore anno ed export CSV, raggiungibile dal prospetto', () => {
+  for (const id of [
+    'leave-history-view',
+    'leave-history-year-select',
+    'leave-history-export-csv-btn',
+    'leave-history-table-container',
+    'leave-history-view-btn',
+    'back-from-leave-history-btn',
+    'back-from-leave-history-footer-btn',
+  ]) {
+    assert.ok(html.includes(`id="${id}"`), `manca #${id}`);
+  }
+  const js = extractInlineModuleScript();
+  assert.match(js, /async function loadLeaveHistory\(year\)/);
+  assert.match(js, /function populateLeaveHistoryYearSelect/);
+  assert.match(js, /function exportLeaveHistoryToCsv/);
+  // Stesso scope del prospetto (ferie/rol/permesso), non tutti i tipi di richiesta.
+  assert.match(js, /\.in\(["']request_type["'],\s*LEAVE_TYPES\)/);
+  // Riusa l'infrastruttura CSV già esistente (rowsToCsv/downloadTextFile/extractVisibleTableRows).
+  assert.match(js, /exportLeaveHistoryToCsv[\s\S]{0,400}extractVisibleTableRows\(table\)/);
+  assert.match(js, /downloadTextFile\(`ferie_rol_permessi_\$\{year\}\.csv`, rowsToCsv\(rows\)/);
+});
+
 test('ROL è una categoria di richiesta separata da permesso, con pulsanti, campo ore e colore propri', () => {
   for (const id of ['req-rol-head', 'req-rol-btn', 'req-rol-fields', 'req-rol-hours']) {
     assert.ok(html.includes(`id="${id}"`), `manca #${id}`);

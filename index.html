@@ -160,6 +160,7 @@
                 <div id="leave-prospectus-body" style="font-size: 0.82rem; color: #374151; line-height: 1.5;">
                     <p class="state-msg">Caricamento...</p>
                 </div>
+                <button type="button" id="leave-history-view-btn" style="margin-top: 0.5rem; background: none; border: none; color: #2563eb; font-weight: 600; font-size: 0.82rem; padding: 0; cursor: pointer; text-decoration: underline;">Vedi storico completo &rarr;</button>
             </div>
             <div id="payslip-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
                 <p style="font-weight: 700; margin: 0 0 0.25rem 0; color: #374151; font-size: 0.95rem;">Busta paga: carica e confronta ore</p>
@@ -254,7 +255,31 @@
         </div>
     </div>
 
-    
+    <div id="leave-history-view" class="hidden">
+        <div class="view-header">
+            <h2>Storico ferie, ROL e permessi</h2>
+            <div class="view-controls">
+                <button type="button" id="back-from-leave-history-btn" class="btn-timbrature" style="max-width: 220px; padding: 10px 14px;">Torna alle timbrature</button>
+            </div>
+        </div>
+
+        <div id="leave-history-controls">
+            <label for="leave-history-year-select">Anno</label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <select id="leave-history-year-select" aria-label="Seleziona anno per lo storico ferie/ROL/permessi" style="flex:1; min-width:140px;"></select>
+                <button type="button" id="leave-history-export-csv-btn" style="background-color:#0f766e; color:white; white-space:nowrap;">Esporta CSV</button>
+            </div>
+        </div>
+
+        <div id="leave-history-table-container">
+            <p class="state-msg">Caricamento storico…</p>
+        </div>
+        <div class="nav-footer-timbrature">
+            <button type="button" id="back-from-leave-history-footer-btn" class="btn-timbrature">Torna alle timbrature</button>
+        </div>
+    </div>
+
+
     <div id="admin-view" class="hidden">
         <div class="view-header">
             <h2>Pannello di Amministrazione</h2>
@@ -598,8 +623,9 @@
         const loadingView = document.getElementById("loading-view");
         const loginView = document.getElementById("login-view");
         const punchView = document.getElementById("punch-view");
-        const historyView = document.getElementById("history-view"); 
+        const historyView = document.getElementById("history-view");
         const adminView = document.getElementById("admin-view");
+        const leaveHistoryView = document.getElementById("leave-history-view");
         // Elementi DOM (CONTROLS & INFO)
         const userNameEl = document.getElementById("user-name");
         const userEmailEl = document.getElementById("user-email");
@@ -624,6 +650,12 @@
         const backFromAdminBtn = document.getElementById("back-from-admin-btn");
         const backFromHistoryFooterBtn = document.getElementById("back-from-history-footer-btn");
         const backFromAdminFooterBtn = document.getElementById("back-from-admin-footer-btn");
+        const leaveHistoryViewBtn = document.getElementById("leave-history-view-btn");
+        const backFromLeaveHistoryBtn = document.getElementById("back-from-leave-history-btn");
+        const backFromLeaveHistoryFooterBtn = document.getElementById("back-from-leave-history-footer-btn");
+        const leaveHistoryYearSelect = document.getElementById("leave-history-year-select");
+        const leaveHistoryTableContainer = document.getElementById("leave-history-table-container");
+        const leaveHistoryExportCsvBtn = document.getElementById("leave-history-export-csv-btn");
 
         // Timbratura automatica per posizione DOM
         const geoAutoPunchToggle = document.getElementById("geo-autopunch-toggle");
@@ -718,9 +750,9 @@
         let monthSelectDebounce = null;
         let currentHistoryUserId = null;
         let autoPunchInProgress = false;
-        const allViews = [loginView, punchView, historyView, adminView];
+        const allViews = [loginView, punchView, historyView, adminView, leaveHistoryView];
 
-        // Timbratura automatica per posizione (solo ingresso mattutino, opt-in)
+        // Timbratura automatica per posizione (tutti i movimenti in ingresso e uscita, opt-in)
         const GEO_AUTOPUNCH_STORAGE_KEY = "badgeapp-geo-autopunch-enabled-v1";
         let geofenceSettingsCache = null;
         let geoWatchId = null;
@@ -794,6 +826,8 @@
                 loadAllProfiles();
                 loadPendingRequests();
                 loadTodayPresence();
+            } else if (!leaveHistoryView.classList.contains("hidden")) {
+                loadLeaveHistory(leaveHistoryYearSelect.value);
             }
         }
 
@@ -818,6 +852,12 @@
                 loadTodayPresence();
                 initGeofenceMapIfNeeded();
                 populateLeaveBalanceEmployeeSelect().then(loadLeaveBalanceForSelection);
+                return;
+            }
+            if (v === "leave-history-view") {
+                populateLeaveHistoryYearSelect();
+                showView(leaveHistoryView);
+                loadLeaveHistory(leaveHistoryYearSelect.value);
                 return;
             }
             showView(punchView);
@@ -1558,6 +1598,108 @@
             });
             leaveProspectusBodyEl.innerHTML = rows.join("");
         }
+
+        // -----------------------------------------------------------------------
+        // Storico ferie/ROL/permessi: vista dedicata (come "Storico Timbrature"),
+        // filtrabile per anno, con export CSV — a differenza di "Ultime
+        // richieste" (limitata a 25 righe, tutti i tipi) qui non c'è limite e
+        // lo scope è lo stesso del prospetto (ferie/rol/permesso).
+        // -----------------------------------------------------------------------
+        const LEAVE_HISTORY_LABELS = { ferie: "Ferie", rol: "ROL", permesso: "Permesso" };
+
+        function populateLeaveHistoryYearSelect() {
+            if (!leaveHistoryYearSelect) return;
+            const currentYear = new Date().getFullYear();
+            leaveHistoryYearSelect.innerHTML = "";
+            for (let year = currentYear; year >= currentYear - 4; year--) {
+                const option = document.createElement("option");
+                option.value = String(year);
+                option.textContent = String(year);
+                leaveHistoryYearSelect.appendChild(option);
+            }
+            leaveHistoryYearSelect.value = String(currentYear);
+        }
+
+        async function loadLeaveHistory(year) {
+            if (!currentUser || !leaveHistoryTableContainer) return;
+            leaveHistoryTableContainer.innerHTML = '<p class="state-msg">Caricamento storico…</p>';
+            const yearStart = `${year}-01-01`;
+            const yearEnd = `${year}-12-31`;
+            const { data, error } = await supabase
+                .from("employee_requests")
+                .select("request_type, start_date, end_date, status, total_hours_declared, note")
+                .eq("user_id", currentUser.id)
+                .in("request_type", LEAVE_TYPES)
+                .lte("start_date", yearEnd)
+                .gte("end_date", yearStart)
+                .order("start_date", { ascending: false });
+            if (error) {
+                console.error("Storico ferie/ROL/permessi:", error);
+                leaveHistoryTableContainer.innerHTML = '<p class="state-msg state-msg--error">Impossibile caricare lo storico.</p>';
+                return;
+            }
+            if (!data || data.length === 0) {
+                leaveHistoryTableContainer.innerHTML = `<p class="state-msg">Nessuna richiesta ferie/ROL/permesso per il ${year}.</p>`;
+                return;
+            }
+            const rowsHtml = data.map((row) => {
+                const d0 = new Date(row.start_date).toLocaleDateString("it-IT");
+                const d1 = new Date(row.end_date).toLocaleDateString("it-IT");
+                const amount =
+                    row.request_type === "ferie"
+                        ? `${countBusinessDays(row.start_date, row.end_date)} gg`
+                        : Number.isFinite(row.total_hours_declared)
+                          ? `${row.total_hours_declared} ore`
+                          : "-";
+                const note = row.note ? String(row.note).slice(0, 150) : "";
+                return `<tr>
+                    <td>${LEAVE_HISTORY_LABELS[row.request_type] || row.request_type}</td>
+                    <td>${STATUS_LABELS[row.status] || row.status}</td>
+                    <td>${d0}</td>
+                    <td>${d1}</td>
+                    <td>${amount}</td>
+                    <td>${note}</td>
+                </tr>`;
+            });
+            leaveHistoryTableContainer.innerHTML = `
+                <table id="leave-history-table">
+                    <thead>
+                        <tr><th>Tipo</th><th>Stato</th><th>Dal</th><th>Al</th><th>Giorni/Ore</th><th>Note</th></tr>
+                    </thead>
+                    <tbody>${rowsHtml.join("")}</tbody>
+                </table>`;
+        }
+
+        function exportLeaveHistoryToCsv() {
+            const table = leaveHistoryTableContainer.querySelector("#leave-history-table");
+            if (!table) {
+                showMessage("Nessuna richiesta da esportare per l'anno selezionato.", true);
+                return;
+            }
+            const rows = extractVisibleTableRows(table);
+            const year = leaveHistoryYearSelect.value || "anno";
+            downloadTextFile(`ferie_rol_permessi_${year}.csv`, rowsToCsv(rows), "text/csv;charset=utf-8;");
+        }
+
+        if (leaveHistoryViewBtn) {
+            leaveHistoryViewBtn.addEventListener("click", () => {
+                populateLeaveHistoryYearSelect();
+                showView(leaveHistoryView);
+                loadLeaveHistory(leaveHistoryYearSelect.value);
+            });
+        }
+        if (leaveHistoryYearSelect) {
+            leaveHistoryYearSelect.addEventListener("change", () => loadLeaveHistory(leaveHistoryYearSelect.value));
+        }
+        if (leaveHistoryExportCsvBtn) {
+            leaveHistoryExportCsvBtn.addEventListener("click", exportLeaveHistoryToCsv);
+        }
+        function goBackFromLeaveHistoryToPunch() {
+            showView(punchView);
+            loadPunches();
+        }
+        if (backFromLeaveHistoryBtn) backFromLeaveHistoryBtn.addEventListener("click", goBackFromLeaveHistoryToPunch);
+        if (backFromLeaveHistoryFooterBtn) backFromLeaveHistoryFooterBtn.addEventListener("click", goBackFromLeaveHistoryToPunch);
 
         // -----------------------------------------------------------------------
         // Busta paga: upload PDF/foto, lettura OCR opzionale, confronto ore
