@@ -150,7 +150,25 @@ test('la timbratura automatica scatta SOLO sulla transizione vera fuori→dentro
   assert.match(js, /function saveGeofenceTransitionState/);
   assert.match(js, /localStorage\.getItem\(GEOFENCE_TRANSITION_STORAGE_KEY\)/);
   assert.match(js, /localStorage\.setItem\(GEOFENCE_TRANSITION_STORAGE_KEY/);
-  assert.match(js, /if\s*\(\s*wasInside\s*===\s*false\s*&&\s*insideNow\s*===\s*true\s*\)\s*\{\s*attemptAutoMorningPunch\(\);/);
+  assert.match(js, /if\s*\(\s*wasInside\s*===\s*false\s*&&\s*insideNow\s*===\s*true\s*\)\s*\{/);
+  assert.match(js, /attemptAutoMorningPunch\(\)\.then\(\s*\(settled\)\s*=>\s*\{\s*saveGeofenceTransitionState\(settled\);/);
+});
+
+test('la timbratura automatica non promette un ingresso imminente quando non c\'è una transizione rilevata (evita il messaggio fuorviante segnalato in review)', () => {
+  const js = extractInlineModuleScript();
+  // Se wasInside non è "false" (nessuna base nota, es. prima lettura del
+  // giorno già dentro l'area) il messaggio non deve promettere una
+  // timbratura automatica che non scatterà mai senza un'uscita e un rientro.
+  assert.match(js, /wasInside === false\s*\?\s*"Sei entrato nell'area/);
+  assert.match(js, /transizione dall'esterno.*timbra manualmente/);
+});
+
+test('attemptAutoMorningPunch segnala l\'esito (timbrato/già timbrato vs da ritentare) invece di essere fire-and-forget', () => {
+  const js = extractInlineModuleScript();
+  // Un errore transitorio in lettura o scrittura deve restituire false, così
+  // la transizione NON viene marcata come "gestita" e la prossima lettura
+  // "dentro" può ritentare, invece di perdere silenziosamente la timbratura.
+  assert.match(js, /async function attemptAutoMorningPunch\(\)[\s\S]{0,2000}return false;[\s\S]{0,600}return true;/);
 });
 
 test('il flusso di approvazione richieste esiste ed esclude le rifiutate dal calendario', () => {

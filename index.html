@@ -942,8 +942,14 @@
          * timbra. Disaccoppiato da quale vista è aperta al momento: il rilevamento
          * della posizione deve funzionare anche se il dipendente è sullo storico.
          */
+        /**
+         * @returns {Promise<boolean>} true se la transizione è "gestita" (timbrato
+         * ora, oppure risultava già timbrato) e quindi va memorizzata come tale;
+         * false se va ritentata alla prossima lettura "dentro" (errore
+         * transitorio in lettura/scrittura, o un tentativo era già in corso).
+         */
         async function attemptAutoMorningPunch() {
-            if (!currentUser || autoPunchInProgress) return;
+            if (!currentUser || autoPunchInProgress) return false;
             const morningField = punchSteps[0].field; // "iniziomattina"
             const today = getTodayDateString();
 
@@ -955,9 +961,9 @@
                 .maybeSingle();
             if (error) {
                 console.warn("Timbratura automatica: verifica stato odierno fallita, riprovo al prossimo rilevamento.", error);
-                return;
+                return false;
             }
-            if (data && data[morningField]) return; // già timbrato oggi, non fare nulla
+            if (data && data[morningField]) return true; // già timbrato oggi, non fare nulla
 
             autoPunchInProgress = true;
             const nowTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
@@ -967,12 +973,13 @@
             if (upsertError) {
                 console.error("Timbratura automatica per posizione fallita:", upsertError);
                 showMessage("Timbratura automatica per posizione non riuscita. Puoi timbrare manualmente.", true);
-                return;
+                return false; // ritenta alla prossima lettura "dentro"
             }
             showMessage(`Timbratura automatica: ingresso registrato per posizione (${nowTime}).`);
             if (!punchView.classList.contains("hidden")) {
                 loadPunches();
             }
+            return true;
         }
 
         const GEOFENCE_TRANSITION_STORAGE_KEY = "badgeapp_geofence_transition_state";
@@ -1036,13 +1043,25 @@
                     const previousState = loadGeofenceTransitionState();
                     const wasInside = previousState ? previousState.wasInside : null;
                     if (wasInside === false && insideNow === true) {
-                        attemptAutoMorningPunch();
+                        // La transizione si scrive come "gestita" solo dopo che il
+                        // tentativo si è risolto: se fallisce per un errore
+                        // transitorio, la base resta "fuori" così la prossima
+                        // lettura "dentro" la ritenta invece di darla per persa.
+                        attemptAutoMorningPunch().then((settled) => {
+                            saveGeofenceTransitionState(settled);
+                        });
+                    } else {
+                        saveGeofenceTransitionState(insideNow);
                     }
-                    saveGeofenceTransitionState(insideNow);
                     if (geoAutoPunchStatusEl) {
-                        geoAutoPunchStatusEl.textContent = insideNow
-                            ? "Sei nell'area: se manca l'ingresso mattutino verrà timbrato a breve."
-                            : "Attiva — in attesa che tu entri nell'area.";
+                        if (insideNow === true) {
+                            geoAutoPunchStatusEl.textContent =
+                                wasInside === false
+                                    ? "Sei entrato nell'area: se manca l'ingresso mattutino verrà timbrato a breve."
+                                    : "Sei nell'area, ma non è stata rilevata una transizione dall'esterno: se l'ingresso manca, timbra manualmente.";
+                        } else {
+                            geoAutoPunchStatusEl.textContent = "Attiva — in attesa che tu entri nell'area.";
+                        }
                     }
                 },
                 (err) => {
@@ -1067,6 +1086,16 @@
                 startGeoAutoPunchWatch();
             } else {
                 stopGeoAutoPunchWatch();
+                // Azzera la base dentro/fuori: se l'utente disattiva e riattiva
+                // dopo essere uscito e rientrato, quello stato stantio farebbe
+                // perdere la transizione reale (nessuna base "fuori" aggiornata
+                // da cui rilevarla).
+                try {
+                    localStorage.removeItem(GEOFENCE_TRANSITION_STORAGE_KEY);
+                } catch {
+                    // localStorage non disponibile: nessun problema, si riparte
+                    // comunque senza una base nota alla prossima attivazione.
+                }
                 if (geoAutoPunchStatusEl) geoAutoPunchStatusEl.textContent = "";
             }
         }
