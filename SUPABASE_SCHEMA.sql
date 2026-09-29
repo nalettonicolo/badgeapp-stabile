@@ -931,6 +931,27 @@ COMMENT ON COLUMN public.payslip_documents.verified IS 'true = numeri (via OCR o
 
 ALTER TABLE public.payslip_documents ENABLE ROW LEVEL SECURITY;
 
+-- insert/update sono ricreate ad ogni esecuzione (DROP + CREATE, non "IF NOT
+-- EXISTS"): la condizione ora vincola anche uploaded_by, quindi un run su
+-- un'installazione dove esisteva già la versione precedente della policy
+-- deve sostituirla, non lasciarla invariata perché il nome esiste già.
+DROP POLICY IF EXISTS payslip_documents_insert_own_or_admin ON public.payslip_documents;
+CREATE POLICY payslip_documents_insert_own_or_admin
+  ON public.payslip_documents FOR INSERT TO authenticated
+  WITH CHECK (
+    (auth.uid() = user_id OR public.is_admin(auth.uid()))
+    AND (uploaded_by = auth.uid() OR public.is_admin(auth.uid()))
+  );
+
+DROP POLICY IF EXISTS payslip_documents_update_own_or_admin ON public.payslip_documents;
+CREATE POLICY payslip_documents_update_own_or_admin
+  ON public.payslip_documents FOR UPDATE TO authenticated
+  USING (auth.uid() = user_id OR public.is_admin(auth.uid()))
+  WITH CHECK (
+    (auth.uid() = user_id OR public.is_admin(auth.uid()))
+    AND (uploaded_by = auth.uid() OR public.is_admin(auth.uid()))
+  );
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -940,25 +961,6 @@ BEGIN
     CREATE POLICY payslip_documents_select_own_or_admin
       ON public.payslip_documents FOR SELECT TO authenticated
       USING (auth.uid() = user_id OR public.is_admin(auth.uid()));
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'payslip_documents' AND policyname = 'payslip_documents_insert_own_or_admin'
-  ) THEN
-    CREATE POLICY payslip_documents_insert_own_or_admin
-      ON public.payslip_documents FOR INSERT TO authenticated
-      WITH CHECK (auth.uid() = user_id OR public.is_admin(auth.uid()));
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'payslip_documents' AND policyname = 'payslip_documents_update_own_or_admin'
-  ) THEN
-    CREATE POLICY payslip_documents_update_own_or_admin
-      ON public.payslip_documents FOR UPDATE TO authenticated
-      USING (auth.uid() = user_id OR public.is_admin(auth.uid()))
-      WITH CHECK (auth.uid() = user_id OR public.is_admin(auth.uid()));
   END IF;
 
   IF NOT EXISTS (
