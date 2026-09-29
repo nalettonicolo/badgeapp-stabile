@@ -1631,7 +1631,8 @@
             }
             const { year, month } = parseSelectedPayslipMonth();
             if (!Number.isFinite(year) || !Number.isFinite(month)) return;
-            const ext = (file.name.split(".").pop() || "bin").toLowerCase();
+            const dotIndex = file.name.lastIndexOf(".");
+            const ext = (dotIndex > -1 ? file.name.slice(dotIndex + 1) : "bin").toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
             const path = `${currentUser.id}/${year}-${String(month).padStart(2, "0")}.${ext}`;
             if (payslipFileStatusEl) payslipFileStatusEl.textContent = "Caricamento...";
             const { error: uploadError } = await supabase.storage.from("payslips").upload(path, file, { upsert: true, contentType: file.type || undefined });

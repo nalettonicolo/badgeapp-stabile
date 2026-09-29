@@ -16,14 +16,28 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
+// supabase.functions.invoke() dal browser è una chiamata cross-origin (l'app
+// gira su un altro dominio rispetto a *.supabase.co): senza questi header e
+// senza gestire la preflight OPTIONS, il browser blocca la risposta ancora
+// prima che arrivi al codice della pagina — la funzione fallirebbe sempre,
+// indipendentemente da ANTHROPIC_API_KEY.
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
   });
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
   if (req.method !== "POST") {
     return jsonResponse({ error: "Metodo non supportato." }, 405);
   }

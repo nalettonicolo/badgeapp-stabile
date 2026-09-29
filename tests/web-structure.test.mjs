@@ -240,6 +240,15 @@ test('upload busta paga: file su Storage privato, ore dichiarate confrontate con
   assert.match(js, /catch\s*\(err\)\s*\{\s*console\.warn\(["']OCR busta paga non disponibile/);
 });
 
+test('upload busta paga: l\'estensione del path Storage è sanificata (niente slash/punti dal nome file scelto dall\'utente)', () => {
+  const js = extractInlineModuleScript();
+  // Un nome file senza punto (es. "IMG12345") non deve finire per intero
+  // nel path come "estensione" — e comunque solo caratteri alfanumerici
+  // possono comporre l'estensione usata nel path Storage.
+  assert.match(js, /lastIndexOf\(["']\.["']\)/);
+  assert.match(js, /replace\(\/\[\^a-z0-9\]\/g, ["']["']\)/);
+});
+
 test('ROL è una categoria di richiesta separata da permesso, con pulsanti, campo ore e colore propri', () => {
   for (const id of ['req-rol-head', 'req-rol-btn', 'req-rol-fields', 'req-rol-hours']) {
     assert.ok(html.includes(`id="${id}"`), `manca #${id}`);
