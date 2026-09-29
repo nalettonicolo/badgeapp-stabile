@@ -201,11 +201,11 @@
             <div id="geo-autopunch-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <input type="checkbox" id="geo-autopunch-toggle" style="width: auto;" />
-                    <label for="geo-autopunch-toggle" style="font-weight: 600; font-size: 0.9rem; color: #374151;">Timbra automaticamente l'ingresso mattutino quando entro in sede</label>
+                    <label for="geo-autopunch-toggle" style="font-weight: 600; font-size: 0.9rem; color: #374151;">Timbra automaticamente ingressi e uscite quando entro/esco dalla sede</label>
                 </div>
                 <p style="font-size: 0.78rem; color: #6b7280; margin: 0.35rem 0 0 26px; line-height: 1.4;">
                     Richiede il permesso di localizzazione del browser e funziona solo con questa pagina aperta (non ad app chiusa).
-                    Timbra solo l'ingresso mattutino, una volta al giorno, e solo se l'amministratore ha configurato un'area.
+                    Timbra il campo mancante coerente col movimento (ingresso mattutino o rientro pomeridiano quando entri, uscita pausa pranzo o fine giornata quando esci), solo se l'amministratore ha configurato un'area.
                 </p>
                 <p id="geo-autopunch-status" style="font-size: 0.78rem; color: #6b7280; margin: 0.35rem 0 0 26px;"></p>
             </div>
@@ -943,19 +943,50 @@
          * della posizione deve funzionare anche se il dipendente è sullo storico.
          */
         /**
-         * @returns {Promise<boolean>} true se la transizione è "gestita" (timbrato
-         * ora, oppure risultava già timbrato) e quindi va memorizzata come tale;
-         * false se va ritentata alla prossima lettura "dentro" (errore
-         * transitorio in lettura/scrittura, o un tentativo era già in corso).
+         * Determina quale dei 4 campi timbrare per una transizione nella
+         * direzione data, in base a cosa manca ancora oggi — non un indice
+         * fisso: così una timbratura già fatta a mano (es. ingresso mattutino
+         * inserito manualmente) sposta correttamente il prossimo scatto
+         * automatico al passo successivo coerente, invece di riprovare un
+         * campo già compilato.
+         * "in" (transizione fuori→dentro): iniziomattina, poi iniziopomeriggio.
+         * "out" (transizione dentro→fuori): finemattina, poi finepomeriggio —
+         * solo se il rispettivo ingresso precedente è già presente.
          */
-        async function attemptAutoMorningPunch() {
+        function nextAutoPunchField(direction, state) {
+            const s = state || {};
+            if (direction === "in") {
+                if (!s.iniziomattina) return "iniziomattina";
+                if (!s.iniziopomeriggio) return "iniziopomeriggio";
+                return null;
+            }
+            if (s.iniziomattina && !s.finemattina) return "finemattina";
+            if (s.iniziopomeriggio && !s.finepomeriggio) return "finepomeriggio";
+            return null;
+        }
+
+        const AUTO_PUNCH_FIELD_LABELS = {
+            iniziomattina: "ingresso mattutino",
+            finemattina: "uscita pausa pranzo",
+            iniziopomeriggio: "rientro pomeridiano",
+            finepomeriggio: "uscita fine giornata",
+        };
+
+        /**
+         * @param {"in"|"out"} direction transizione fuori→dentro o dentro→fuori.
+         * @returns {Promise<boolean>} true se la transizione è "gestita" (timbrato
+         * ora, oppure non c'era nulla da timbrare per questa direzione) e quindi
+         * va memorizzata come tale; false se va ritentata alla prossima lettura
+         * nella stessa direzione (errore transitorio in lettura/scrittura, o un
+         * tentativo era già in corso).
+         */
+        async function attemptAutoPunchForTransition(direction) {
             if (!currentUser || autoPunchInProgress) return false;
-            const morningField = punchSteps[0].field; // "iniziomattina"
             const today = getTodayDateString();
 
             const { data, error } = await supabase
                 .from("daily_punches")
-                .select(morningField)
+                .select("iniziomattina, finemattina, iniziopomeriggio, finepomeriggio")
                 .eq("user_id", currentUser.id)
                 .eq("punch_date", today)
                 .maybeSingle();
@@ -963,19 +994,20 @@
                 console.warn("Timbratura automatica: verifica stato odierno fallita, riprovo al prossimo rilevamento.", error);
                 return false;
             }
-            if (data && data[morningField]) return true; // già timbrato oggi, non fare nulla
+            const field = nextAutoPunchField(direction, data);
+            if (!field) return true; // nulla da timbrare in questa direzione: transizione "gestita" comunque
 
             autoPunchInProgress = true;
             const nowTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
-            const { error: upsertError } = await upsertPunch(today, morningField, nowTime);
+            const { error: upsertError } = await upsertPunch(today, field, nowTime);
             autoPunchInProgress = false;
 
             if (upsertError) {
                 console.error("Timbratura automatica per posizione fallita:", upsertError);
                 showMessage("Timbratura automatica per posizione non riuscita. Puoi timbrare manualmente.", true);
-                return false; // ritenta alla prossima lettura "dentro"
+                return false; // ritenta alla prossima lettura nella stessa direzione
             }
-            showMessage(`Timbratura automatica: ingresso registrato per posizione (${nowTime}).`);
+            showMessage(`Timbratura automatica: ${AUTO_PUNCH_FIELD_LABELS[field]} registrato per posizione (${nowTime}).`);
             if (!punchView.classList.contains("hidden")) {
                 loadPunches();
             }
@@ -1034,21 +1066,29 @@
                     const maxAcc = Number.isFinite(settings.max_accuracy_meters) ? settings.max_accuracy_meters : 60;
                     if (Number.isFinite(accuracy) && accuracy > maxAcc) return; // lettura troppo imprecisa: ignorata, niente cambio di stato
                     const insideNow = isInsideGeofence(latitude, longitude, settings);
-                    // Timbra SOLO sulla transizione vera fuori→dentro (scelta
-                    // esplicita: mai sulla semplice "sono dentro adesso" senza una
-                    // base "ero fuori" nota). La base è letta da localStorage,
-                    // non da una variabile in memoria, così sopravvive sia alla
+                    // Timbra SOLO su una transizione vera (scelta esplicita: mai
+                    // sulla semplice "sono dentro/fuori adesso" senza una base
+                    // nota) — sia fuori→dentro (ingresso mattutino o rientro
+                    // pomeridiano, quale manca) sia dentro→fuori (uscita pausa
+                    // pranzo o fine giornata, quale manca): vedi
+                    // nextAutoPunchField(). La base è letta da localStorage, non
+                    // da una variabile in memoria, così sopravvive sia alla
                     // sospensione in background di iOS Safari sia alla chiusura
                     // completa dell'app durante la stessa giornata.
                     const previousState = loadGeofenceTransitionState();
                     const wasInside = previousState ? previousState.wasInside : null;
+                    // La transizione si scrive come "gestita" solo dopo che il
+                    // tentativo si è risolto: se fallisce per un errore
+                    // transitorio, la base resta quella precedente così la
+                    // prossima lettura nella stessa direzione la ritenta invece
+                    // di darla per persa.
                     if (wasInside === false && insideNow === true) {
-                        // La transizione si scrive come "gestita" solo dopo che il
-                        // tentativo si è risolto: se fallisce per un errore
-                        // transitorio, la base resta "fuori" così la prossima
-                        // lettura "dentro" la ritenta invece di darla per persa.
-                        attemptAutoMorningPunch().then((settled) => {
+                        attemptAutoPunchForTransition("in").then((settled) => {
                             saveGeofenceTransitionState(settled);
+                        });
+                    } else if (wasInside === true && insideNow === false) {
+                        attemptAutoPunchForTransition("out").then((settled) => {
+                            saveGeofenceTransitionState(!settled);
                         });
                     } else {
                         saveGeofenceTransitionState(insideNow);
@@ -1057,10 +1097,13 @@
                         if (insideNow === true) {
                             geoAutoPunchStatusEl.textContent =
                                 wasInside === false
-                                    ? "Sei entrato nell'area: se manca l'ingresso mattutino verrà timbrato a breve."
-                                    : "Sei nell'area, ma non è stata rilevata una transizione dall'esterno: se l'ingresso manca, timbra manualmente.";
+                                    ? "Sei entrato nell'area: se manca una timbratura in ingresso verrà registrata a breve."
+                                    : "Sei nell'area, ma non è stata rilevata una transizione dall'esterno: se manca una timbratura, registrala manualmente.";
                         } else {
-                            geoAutoPunchStatusEl.textContent = "Attiva — in attesa che tu entri nell'area.";
+                            geoAutoPunchStatusEl.textContent =
+                                wasInside === true
+                                    ? "Sei uscito dall'area: se manca una timbratura in uscita verrà registrata a breve."
+                                    : "Attiva — in attesa di un tuo movimento dentro/fuori dall'area.";
                         }
                     }
                 },
@@ -1074,7 +1117,7 @@
                 { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
             );
             if (geoAutoPunchStatusEl) {
-                geoAutoPunchStatusEl.textContent = "Attiva — in attesa che tu entri nell'area.";
+                geoAutoPunchStatusEl.textContent = "Attiva — in attesa di un tuo movimento dentro/fuori dall'area.";
             }
             return true;
         }

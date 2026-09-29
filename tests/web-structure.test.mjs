@@ -131,44 +131,54 @@ test('index.html importa le funzioni geofence da js/utils.js', () => {
   assert.match(html, /hasUsableGeofence/);
 });
 
-test('la timbratura automatica per posizione tocca solo il campo di ingresso mattutino', () => {
+test('la timbratura automatica per posizione copre tutti i movimenti (ingresso mattutino, uscita pausa, rientro pomeridiano, uscita fine giornata), non solo l\'ingresso mattutino', () => {
+  // Richiesta esplicita dell'utente ("TUTTI I MOVIMENTI IN INGRESSO E
+  // USCITA"): nextAutoPunchField() sceglie il campo in base a cosa manca
+  // ancora oggi per la direzione data, non un indice fisso — così una
+  // timbratura già fatta a mano non viene mai duplicata né saltata.
   const js = extractInlineModuleScript();
-  assert.match(js, /async function attemptAutoMorningPunch/);
-  // Deve derivare il campo da punchSteps[0] (iniziomattina), mai un altro passo.
-  assert.match(js, /punchSteps\[0\]\.field/);
+  assert.match(js, /function nextAutoPunchField\(direction, state\)/);
+  assert.match(js, /if\s*\(direction === "in"\)\s*\{\s*if\s*\(!s\.iniziomattina\)\s*return "iniziomattina";\s*if\s*\(!s\.iniziopomeriggio\)\s*return "iniziopomeriggio";/);
+  assert.match(js, /if\s*\(s\.iniziomattina\s*&&\s*!s\.finemattina\)\s*return "finemattina";/);
+  assert.match(js, /if\s*\(s\.iniziopomeriggio\s*&&\s*!s\.finepomeriggio\)\s*return "finepomeriggio";/);
+  assert.match(js, /async function attemptAutoPunchForTransition\(direction\)/);
 });
 
-test('la timbratura automatica scatta SOLO sulla transizione vera fuori→dentro, con base persistita in localStorage (non in una variabile in memoria)', () => {
-  // Scelta esplicita dell'utente: mai timbrare sulla semplice "sono dentro
-  // adesso" senza una base "ero fuori" nota. Per restare comunque robusta a
-  // iOS Safari (che sospende il JS in background e farebbe perdere una
-  // semplice variabile in memoria), la base "ero fuori/dentro" è letta e
-  // scritta su localStorage, che sopravvive sia alla sospensione in
-  // background sia alla chiusura completa dell'app nella stessa giornata.
+test('la timbratura automatica scatta SOLO su una transizione vera (fuori→dentro O dentro→fuori), con base persistita in localStorage (non in una variabile in memoria)', () => {
+  // Scelta esplicita dell'utente: mai timbrare sulla semplice "sono dentro/
+  // fuori adesso" senza una base nota. Per restare comunque robusta a iOS
+  // Safari (che sospende il JS in background e farebbe perdere una semplice
+  // variabile in memoria), la base "ero fuori/dentro" è letta e scritta su
+  // localStorage, che sopravvive sia alla sospensione in background sia
+  // alla chiusura completa dell'app nella stessa giornata.
   const js = extractInlineModuleScript();
   assert.match(js, /function loadGeofenceTransitionState/);
   assert.match(js, /function saveGeofenceTransitionState/);
   assert.match(js, /localStorage\.getItem\(GEOFENCE_TRANSITION_STORAGE_KEY\)/);
   assert.match(js, /localStorage\.setItem\(GEOFENCE_TRANSITION_STORAGE_KEY/);
   assert.match(js, /if\s*\(\s*wasInside\s*===\s*false\s*&&\s*insideNow\s*===\s*true\s*\)\s*\{/);
-  assert.match(js, /attemptAutoMorningPunch\(\)\.then\(\s*\(settled\)\s*=>\s*\{\s*saveGeofenceTransitionState\(settled\);/);
+  assert.match(js, /attemptAutoPunchForTransition\("in"\)\.then\(\s*\(settled\)\s*=>\s*\{\s*saveGeofenceTransitionState\(settled\);/);
+  assert.match(js, /else if\s*\(\s*wasInside\s*===\s*true\s*&&\s*insideNow\s*===\s*false\s*\)\s*\{/);
+  assert.match(js, /attemptAutoPunchForTransition\("out"\)\.then\(\s*\(settled\)\s*=>\s*\{\s*saveGeofenceTransitionState\(!settled\);/);
 });
 
-test('la timbratura automatica non promette un ingresso imminente quando non c\'è una transizione rilevata (evita il messaggio fuorviante segnalato in review)', () => {
+test('la timbratura automatica non promette una timbratura imminente quando non c\'è una transizione rilevata (evita il messaggio fuorviante segnalato in review)', () => {
   const js = extractInlineModuleScript();
   // Se wasInside non è "false" (nessuna base nota, es. prima lettura del
   // giorno già dentro l'area) il messaggio non deve promettere una
-  // timbratura automatica che non scatterà mai senza un'uscita e un rientro.
+  // timbratura automatica che non scatterà mai senza un movimento reale.
   assert.match(js, /wasInside === false\s*\?\s*"Sei entrato nell'area/);
-  assert.match(js, /transizione dall'esterno.*timbra manualmente/);
+  assert.match(js, /transizione dall'esterno.*registrala manualmente/);
+  assert.match(js, /wasInside === true\s*\?\s*"Sei uscito dall'area/);
 });
 
-test('attemptAutoMorningPunch segnala l\'esito (timbrato/già timbrato vs da ritentare) invece di essere fire-and-forget', () => {
+test('attemptAutoPunchForTransition segnala l\'esito (timbrato/nulla da fare vs da ritentare) invece di essere fire-and-forget', () => {
   const js = extractInlineModuleScript();
   // Un errore transitorio in lettura o scrittura deve restituire false, così
   // la transizione NON viene marcata come "gestita" e la prossima lettura
-  // "dentro" può ritentare, invece di perdere silenziosamente la timbratura.
-  assert.match(js, /async function attemptAutoMorningPunch\(\)[\s\S]{0,2000}return false;[\s\S]{0,600}return true;/);
+  // nella stessa direzione può ritentare, invece di perdere silenziosamente
+  // la timbratura.
+  assert.match(js, /async function attemptAutoPunchForTransition\(direction\)[\s\S]{0,2000}return false;[\s\S]{0,600}return true;/);
 });
 
 test('il flusso di approvazione richieste esiste ed esclude le rifiutate dal calendario', () => {
