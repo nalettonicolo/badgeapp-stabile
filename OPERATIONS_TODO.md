@@ -41,6 +41,23 @@ che l'agente non ha. Vanno fatti a mano dal proprietario del progetto.
   manuale delle ore dichiarate resta sempre disponibile e sufficiente per
   usare il confronto busta paga.
 
+## Expo/EAS → Account dell'azienda
+
+- [ ] **Progetto EAS + EXPO_TOKEN per pubblicare davvero gli aggiornamenti OTA mobile**:
+  `.github/workflows/publish-mobile-ota.yml` esiste e gira a ogni push su
+  `badgeapp-mobile/`, ma non ha mai pubblicato nulla: verificato nei log
+  reali del workflow, salta sempre con "EXPO_TOKEN non impostato" perché
+  quel secret non è mai stato creato. In più non esiste ancora nessun
+  progetto EAS collegato (`app.config.js` legge `EAS_PROJECT_ID` da env,
+  ma la variabile non è mai stata impostata né in CI né altrove) — serve
+  un login reale su un account Expo (gratuito) che l'agente non può fare
+  da qui. Istruzioni passo-passo (login, `eas init`, generare il token, 2
+  secret GitHub da aggiungere) in `.github/GITHUB_SECRETS.md`, sezione
+  "Publish mobile OTA". Finché non è fatto: il sito web continua a
+  pubblicarsi da solo via Netlify a ogni push (non serve nulla di questo
+  per il web); solo l'app mobile nativa resta senza aggiornamenti OTA
+  automatici.
+
 ## Branding / design (decisione di prodotto, non tecnica)
 
 - [x] **Logo "T" (Timbrature) su icone web (PWA) e mobile**: monogramma
