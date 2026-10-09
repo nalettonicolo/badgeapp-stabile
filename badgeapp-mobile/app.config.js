@@ -39,9 +39,12 @@ module.exports = {
       'expo-secure-store',
     ],
     extra: {
-      ...(process.env.EAS_PROJECT_ID
-        ? { eas: { projectId: process.env.EAS_PROJECT_ID } }
-        : {}),
+      eas: {
+        // ID pubblico del progetto EAS (https://expo.dev/accounts/nalettonicolo/projects/badgeapp-mobile),
+        // non un segreto: eas init non può scriverlo da solo qui perché questa
+        // è una config dinamica (app.config.js), non un app.json statico.
+        projectId: process.env.EAS_PROJECT_ID ?? 'd80ac4ac-b39e-420f-a1d2-b13fe4381481',
+      },
       supabaseUrl:
         process.env.EXPO_PUBLIC_SUPABASE_URL ??
         'https://pobrjdrqpzerjlcqnpra.supabase.co',

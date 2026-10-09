@@ -43,40 +43,32 @@ necessario in CI).
 Il workflow **Publish mobile OTA** (`.github/workflows/publish-mobile-ota.yml`)
 esiste già e gira automaticamente a ogni push su `main` che tocca
 `badgeapp-mobile/`, ma **non ha mai pubblicato nulla**: senza il secret
-`EXPO_TOKEN` salta sempre con un `::notice::` ("EXPO_TOKEN non impostato"),
-e in più nessun progetto EAS è ancora stato creato (serve un login reale su
-un account Expo — un passaggio che l'agente non può fare da qui). Vanno
-fatti entrambi i passi, in quest'ordine:
+`EXPO_TOKEN` salta sempre con un `::notice::` ("EXPO_TOKEN non impostato").
 
-### 1. Crea/collega il progetto EAS (una volta sola, dal tuo computer)
+### 1. Progetto EAS — fatto
 
-```
-cd badgeapp-mobile
-npx eas login        # crea gratis un account su expo.dev se non ne hai uno
-npx eas init          # crea il progetto EAS e stampa il suo Project ID (UUID)
-```
-
-Copia il Project ID stampato da `eas init`: serve al passo 3.
+Creato il 2026-10-09 (`eas init`): `@nalettonicolo/badgeapp-mobile`,
+Project ID `d80ac4ac-b39e-420f-a1d2-b13fe4381481`
+([dashboard](https://expo.dev/accounts/nalettonicolo/projects/badgeapp-mobile)).
+Non è un segreto (è pubblico nell'URL del progetto), quindi è già scritto
+come fallback in `badgeapp-mobile/app.config.js` — non serve nessun secret
+GitHub per questo passo, a meno che un giorno non si voglia ruotare su un
+altro progetto EAS (in tal caso, override con il secret `EAS_PROJECT_ID`).
 
 ### 2. Genera un Access Token Expo
 
 1. Vai su [expo.dev](https://expo.dev) → icona profilo → **Account settings** → **Access tokens**.
 2. **Create token**, dagli un nome (es. "badgeapp-ci"), copialo (mostrato una sola volta).
 
-### 3. Aggiungi i secret su GitHub
+### 3. Aggiungi il secret su GitHub
 
 In GitHub: repo → Settings → Secrets and variables → Actions → **New repository secret**:
 
 | Nome | Valore |
 |------|--------|
 | `EXPO_TOKEN` | Il token generato al passo 2 |
-| `EAS_PROJECT_ID` | Il Project ID stampato da `eas init` al passo 1 |
 
-`EAS_PROJECT_ID` non è davvero "opzionale" come diceva questa tabella prima:
-`app.config.js` lo legge da `process.env.EAS_PROJECT_ID` e, se manca, l'app
-non ha nessun progetto EAS collegato — gli OTA via CI falliscono comunque.
-
-Dopo aver impostato entrambi, verifica con **Actions → Publish mobile OTA →
+Dopo averlo impostato, verifica con **Actions → Publish mobile OTA →
 Run workflow**, oppure fai un push qualunque che tocchi `badgeapp-mobile/`.
 
 ⚠️ `EXPO_TOKEN` è legato al tuo account Expo: trattalo come una password,

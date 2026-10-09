@@ -43,20 +43,21 @@ che l'agente non ha. Vanno fatti a mano dal proprietario del progetto.
 
 ## Expo/EAS → Account dell'azienda
 
-- [ ] **Progetto EAS + EXPO_TOKEN per pubblicare davvero gli aggiornamenti OTA mobile**:
+- [x] **Progetto EAS creato** (2026-10-09): `@nalettonicolo/badgeapp-mobile`,
+  Project ID `d80ac4ac-b39e-420f-a1d2-b13fe4381481`. Scritto come fallback
+  in `badgeapp-mobile/app.config.js` (non è un segreto, è pubblico
+  nell'URL del progetto su expo.dev).
+- [ ] **EXPO_TOKEN per pubblicare davvero gli aggiornamenti OTA mobile**:
   `.github/workflows/publish-mobile-ota.yml` esiste e gira a ogni push su
-  `badgeapp-mobile/`, ma non ha mai pubblicato nulla: verificato nei log
+  `badgeapp-mobile/`, ma non ha ancora pubblicato nulla: verificato nei log
   reali del workflow, salta sempre con "EXPO_TOKEN non impostato" perché
-  quel secret non è mai stato creato. In più non esiste ancora nessun
-  progetto EAS collegato (`app.config.js` legge `EAS_PROJECT_ID` da env,
-  ma la variabile non è mai stata impostata né in CI né altrove) — serve
-  un login reale su un account Expo (gratuito) che l'agente non può fare
-  da qui. Istruzioni passo-passo (login, `eas init`, generare il token, 2
-  secret GitHub da aggiungere) in `.github/GITHUB_SECRETS.md`, sezione
-  "Publish mobile OTA". Finché non è fatto: il sito web continua a
-  pubblicarsi da solo via Netlify a ogni push (non serve nulla di questo
-  per il web); solo l'app mobile nativa resta senza aggiornamenti OTA
-  automatici.
+  quel secret non è mai stato creato — richiede generare un Access Token
+  sul tuo account Expo (expo.dev → Account settings → Access tokens) e
+  aggiungerlo come secret GitHub, un passaggio che l'agente non può fare
+  da qui. Istruzioni in `.github/GITHUB_SECRETS.md`, sezione "Publish
+  mobile OTA". Finché non è fatto: il sito web continua a pubblicarsi da
+  solo via Netlify a ogni push (non serve nulla di questo per il web);
+  solo l'app mobile nativa resta senza aggiornamenti OTA automatici.
 
 ## Branding / design (decisione di prodotto, non tecnica)
 
