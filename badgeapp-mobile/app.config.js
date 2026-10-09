@@ -43,7 +43,13 @@ module.exports = {
         // ID pubblico del progetto EAS (https://expo.dev/accounts/nalettonicolo/projects/badgeapp-mobile),
         // non un segreto: eas init non può scriverlo da solo qui perché questa
         // è una config dinamica (app.config.js), non un app.json statico.
-        projectId: process.env.EAS_PROJECT_ID ?? 'd80ac4ac-b39e-420f-a1d2-b13fe4381481',
+        // "||" e non "??": il workflow CI referenzia sempre EAS_PROJECT_ID
+        // come env (secrets.EAS_PROJECT_ID), quindi se il secret non esiste
+        // GitHub Actions imposta comunque la variabile a stringa vuota, non
+        // "undefined" — "??" non l'avrebbe mai considerata assente e il
+        // fallback qui sotto non sarebbe mai scattato (bug reale osservato
+        // in CI: "EAS project not configured").
+        projectId: process.env.EAS_PROJECT_ID || 'd80ac4ac-b39e-420f-a1d2-b13fe4381481',
       },
       supabaseUrl:
         process.env.EXPO_PUBLIC_SUPABASE_URL ??
