@@ -47,17 +47,19 @@ che l'agente non ha. Vanno fatti a mano dal proprietario del progetto.
   Project ID `d80ac4ac-b39e-420f-a1d2-b13fe4381481`. Scritto come fallback
   in `badgeapp-mobile/app.config.js` (non è un segreto, è pubblico
   nell'URL del progetto su expo.dev).
-- [ ] **EXPO_TOKEN per pubblicare davvero gli aggiornamenti OTA mobile**:
-  `.github/workflows/publish-mobile-ota.yml` esiste e gira a ogni push su
-  `badgeapp-mobile/`, ma non ha ancora pubblicato nulla: verificato nei log
-  reali del workflow, salta sempre con "EXPO_TOKEN non impostato" perché
-  quel secret non è mai stato creato — richiede generare un Access Token
-  sul tuo account Expo (expo.dev → Account settings → Access tokens) e
-  aggiungerlo come secret GitHub, un passaggio che l'agente non può fare
-  da qui. Istruzioni in `.github/GITHUB_SECRETS.md`, sezione "Publish
-  mobile OTA". Finché non è fatto: il sito web continua a pubblicarsi da
-  solo via Netlify a ogni push (non serve nulla di questo per il web);
-  solo l'app mobile nativa resta senza aggiornamenti OTA automatici.
+- [x] **EXPO_TOKEN configurato e pubblicazione OTA verificata** (2026-10-09):
+  primo aggiornamento OTA reale pubblicato con successo via CI (branch
+  `production`, runtime version `1.1.0`, piattaforme android+ios —
+  [dashboard](https://expo.dev/accounts/nalettonicolo/projects/badgeapp-mobile/updates/1fe96885-4c32-46f9-a5ec-571559fb7674)).
+  Due bug reali trovati e corretti lungo il percorso (entrambi in
+  `badgeapp-mobile/app.config.js`): il fallback di `EAS_PROJECT_ID`
+  usava `??` invece di `||` (una env var referenziata nel workflow ma
+  senza secret diventa stringa vuota in CI, non `undefined`, quindi
+  `??` non scattava mai); mancava `expo.updates.url`
+  (`https://u.expo.dev/<projectId>`), campo distinto da
+  `extra.eas.projectId` ma comunque richiesto da EAS Update. Da ora in
+  poi ogni push su `main` che tocca `badgeapp-mobile/` pubblica un OTA
+  automaticamente.
 
 ## Branding / design (decisione di prodotto, non tecnica)
 

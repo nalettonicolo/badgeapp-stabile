@@ -34,45 +34,45 @@ mai nel codice. Senza questo secret il workflow continua a funzionare come
 ping preventivo; se il progetto va comunque in pausa, il job fallisce con
 un errore che ti dice di riattivarlo a mano dalla dashboard.
 
-## Publish mobile OTA (opzionale)
+## Publish mobile OTA — configurato e verificato (2026-10-09)
 
 Il sito web NON usa secret GitHub: Netlify è collegato al repo via integrazione
 Git nativa e fa deploy da solo (nessun `NETLIFY_AUTH_TOKEN`/`NETLIFY_SITE_ID`
 necessario in CI).
 
 Il workflow **Publish mobile OTA** (`.github/workflows/publish-mobile-ota.yml`)
-esiste già e gira automaticamente a ogni push su `main` che tocca
-`badgeapp-mobile/`, ma **non ha mai pubblicato nulla**: senza il secret
-`EXPO_TOKEN` salta sempre con un `::notice::` ("EXPO_TOKEN non impostato").
+gira automaticamente a ogni push su `main` che tocca `badgeapp-mobile/` e
+pubblica davvero: primo OTA reale pubblicato con successo (branch
+`production`, runtime `1.1.0`, android+ios —
+[dashboard](https://expo.dev/accounts/nalettonicolo/projects/badgeapp-mobile/updates/1fe96885-4c32-46f9-a5ec-571559fb7674)).
 
-### 1. Progetto EAS — fatto
+Stato attuale:
+- Progetto EAS: `@nalettonicolo/badgeapp-mobile`, Project ID
+  `d80ac4ac-b39e-420f-a1d2-b13fe4381481` — non è un segreto (pubblico
+  nell'URL del progetto), scritto come fallback in
+  `badgeapp-mobile/app.config.js` insieme a `expo.updates.url`
+  (`https://u.expo.dev/<projectId>`, campo distinto ma ugualmente
+  richiesto da EAS Update). Nessun secret GitHub necessario per questo,
+  a meno di voler un giorno ruotare su un altro progetto EAS (override
+  con il secret `EAS_PROJECT_ID`).
+- Secret `EXPO_TOKEN`: configurato su **questo** repository
+  (`nalettonicolo/badgeapp-stabile`) — attenzione a non confonderlo con
+  altri repository dello stesso account che potrebbero avere un secret
+  omonimo (è già successo una volta: il token era stato aggiunto per
+  errore su un repo diverso, `CRM-APP`, e il workflow continuava a
+  saltare silenziosamente perché il secret semplicemente non esisteva
+  qui). Verifica sempre l'URL: deve essere
+  `github.com/nalettonicolo/badgeapp-stabile/settings/secrets/actions`.
 
-Creato il 2026-10-09 (`eas init`): `@nalettonicolo/badgeapp-mobile`,
-Project ID `d80ac4ac-b39e-420f-a1d2-b13fe4381481`
-([dashboard](https://expo.dev/accounts/nalettonicolo/projects/badgeapp-mobile)).
-Non è un segreto (è pubblico nell'URL del progetto), quindi è già scritto
-come fallback in `badgeapp-mobile/app.config.js` — non serve nessun secret
-GitHub per questo passo, a meno che un giorno non si voglia ruotare su un
-altro progetto EAS (in tal caso, override con il secret `EAS_PROJECT_ID`).
-
-### 2. Genera un Access Token Expo
-
-1. Vai su [expo.dev](https://expo.dev) → icona profilo → **Account settings** → **Access tokens**.
-2. **Create token**, dagli un nome (es. "badgeapp-ci"), copialo (mostrato una sola volta).
-
-### 3. Aggiungi il secret su GitHub
-
-In GitHub: repo → Settings → Secrets and variables → Actions → **New repository secret**:
-
-| Nome | Valore |
-|------|--------|
-| `EXPO_TOKEN` | Il token generato al passo 2 |
-
-Dopo averlo impostato, verifica con **Actions → Publish mobile OTA →
-Run workflow**, oppure fai un push qualunque che tocchi `badgeapp-mobile/`.
+Per rigenerare/ruotare il token: [expo.dev](https://expo.dev) → icona
+profilo → **Account settings** → **Access tokens** → **Create token**,
+poi sostituisci il valore dello stesso secret `EXPO_TOKEN` su GitHub.
 
 ⚠️ `EXPO_TOKEN` è legato al tuo account Expo: trattalo come una password,
 non committarlo mai nel codice.
+
+Per verificare manualmente che la pubblicazione funzioni: **Actions →
+Publish mobile OTA → Run workflow**.
 
 ## Se il ping fallisce con 502/503/504
 
