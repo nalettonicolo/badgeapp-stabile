@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { base, colors, radius, shadow, space, typography } from '../lib/theme';
+import { base, colors, radius, shadow, space, touch, typography } from '../lib/theme';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -35,7 +35,10 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.brand}>
-          <View style={styles.logoMark} />
+          {/* Segno del marchio: la "T" bianca su blu, come l'icona dell'app. */}
+          <View style={styles.logoMark} accessible={false}>
+            <Text style={styles.logoLetter}>T</Text>
+          </View>
           <Text style={styles.brandTitle}>BadgeApp</Text>
           <Text style={styles.brandSub}>Timbrature e presenze</Text>
         </View>
@@ -47,6 +50,7 @@ export default function LoginScreen() {
           <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
+            accessibilityLabel="Email"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
@@ -59,6 +63,7 @@ export default function LoginScreen() {
           <Text style={styles.label}>Password</Text>
           <TextInput
             style={styles.input}
+            accessibilityLabel="Password"
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -67,7 +72,7 @@ export default function LoginScreen() {
           />
 
           {error ? (
-            <View style={styles.errBox}>
+            <View style={styles.errBox} accessibilityRole="alert" accessibilityLiveRegion="polite">
               <Text style={styles.err}>{error}</Text>
             </View>
           ) : null}
@@ -109,8 +114,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: colors.primary,
     marginBottom: space.md,
+    alignItems: 'center',
+    justifyContent: 'center',
     ...shadow.card,
   },
+  logoLetter: { color: colors.onPrimary, fontSize: 34, fontWeight: '800', lineHeight: 40 },
   brandTitle: {
     ...typography.hero,
     fontSize: 26,
@@ -149,6 +157,7 @@ const styles = StyleSheet.create({
   },
   err: { color: colors.danger, fontSize: 14, lineHeight: 20 },
   btn: {
+    minHeight: touch.min,
     backgroundColor: colors.primary,
     borderRadius: radius.lg,
     paddingVertical: space.lg,
@@ -156,7 +165,7 @@ const styles = StyleSheet.create({
     marginTop: space.sm,
     ...shadow.sm,
   },
-  btnPressed: { backgroundColor: colors.primaryPressed },
+  btnPressed: { backgroundColor: colors.primaryPressed, transform: [{ scale: 0.98 }] },
   btnDisabled: { opacity: 0.65 },
   btnText: { color: colors.onPrimary, fontSize: 17, fontWeight: '700' },
 });

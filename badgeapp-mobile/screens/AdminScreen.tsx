@@ -7,7 +7,7 @@ import type { RootStackParamList } from '../App';
 import { BackToTimbratureButton } from '../components/BackToTimbratureButton';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { base, colors, layout, radius, shadow, space, typography } from '../lib/theme';
+import { base, colors, layout, radius, shadow, space, touch, typography } from '../lib/theme';
 
 type AdminNav = NativeStackNavigationProp<RootStackParamList, 'Admin'>;
 
@@ -248,6 +248,8 @@ const styles = StyleSheet.create({
     marginBottom: space.md,
   },
   toggle: {
+    minHeight: touch.min,
+    justifyContent: 'center',
     borderRadius: radius.md,
     paddingVertical: space.md,
     alignItems: 'center',
@@ -258,6 +260,8 @@ const styles = StyleSheet.create({
   },
   toggleText: { color: colors.text, fontWeight: '600' },
   saveBtn: {
+    minHeight: touch.min,
+    justifyContent: 'center',
     backgroundColor: colors.success,
     borderRadius: radius.lg,
     paddingVertical: space.md,

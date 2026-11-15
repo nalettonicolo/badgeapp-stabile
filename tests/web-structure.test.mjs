@@ -289,7 +289,10 @@ test('ROL è una categoria di richiesta separata da permesso, con pulsanti, camp
   const js = extractInlineModuleScript();
   // Etichetta e colore dedicati, distinti da malattia/trasferta/ferie/permesso.
   assert.match(js, /REQUEST_TYPE_LABELS\s*=\s*\{[^}]*\brol:\s*["']ROL["']/);
-  assert.match(js, /REQUEST_TYPE_COLORS\s*=\s*\{[^}]*\brol:\s*['"]#[0-9a-fA-F]{6}['"]/);
+  // Il colore è una variabile di styles.css (--req-rol-ink), definita con un valore esadecimale.
+  assert.match(js, /REQUEST_TYPE_COLORS\s*=\s*\{[^}]*\brol:\s*['"]var\(--req-rol-ink\)['"]/);
+  const css = readFileSync(join(root, 'styles.css'), 'utf8');
+  assert.match(css, /--req-rol:\s*#[0-9a-fA-F]{6};/);
   // Il tipo "rol" apre il modale con il proprio campo ore (non riusa i campi trasferta/ferie).
   assert.match(js, /type === "rol"/);
   // Il submit salva le ore ROL dichiarate in total_hours_declared (stessa colonna del prospetto).
