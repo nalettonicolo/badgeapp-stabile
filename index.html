@@ -556,6 +556,7 @@
             rowsToCsv,
             computeLeaveUsage,
             computeLeaveProspectus,
+            escapeHtml,
         } from './js/utils.js';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -1539,7 +1540,7 @@
                 return;
             }
             const lines = data.map((row) => {
-                const tipo = REQUEST_TYPE_LABELS[row.request_type] || row.request_type;
+                const tipo = escapeHtml(REQUEST_TYPE_LABELS[row.request_type] || row.request_type);
                 const d0 = new Date(row.start_date).toLocaleDateString("it-IT");
                 const d1 = new Date(row.end_date).toLocaleDateString("it-IT");
                 let extra = "";
@@ -1552,9 +1553,9 @@
                     const days = countBusinessDays(row.start_date, row.end_date);
                     if (days > 0) extra = ` — ${days} giorni lavorativi`;
                 }
-                const st = STATUS_LABELS[row.status] || row.status;
+                const st = escapeHtml(STATUS_LABELS[row.status] || row.status);
                 const note = row.note
-                    ? ` — ${String(row.note).slice(0, 100)}${String(row.note).length > 100 ? "…" : ""}`
+                    ? ` — ${escapeHtml(String(row.note).slice(0, 100))}${String(row.note).length > 100 ? "…" : ""}`
                     : "";
                 return `<div style="margin-bottom:6px;border-bottom:1px solid #e5e7eb;padding-bottom:6px;"><strong>${tipo}</strong>${extra}: ${d0} – ${d1} · <span style="color:#6b7280;">${st}</span>${note}</div>`;
             });
@@ -1651,10 +1652,10 @@
                         : Number.isFinite(row.total_hours_declared)
                           ? `${row.total_hours_declared} ore`
                           : "-";
-                const note = row.note ? String(row.note).slice(0, 150) : "";
+                const note = row.note ? escapeHtml(String(row.note).slice(0, 150)) : "";
                 return `<tr>
-                    <td>${LEAVE_HISTORY_LABELS[row.request_type] || row.request_type}</td>
-                    <td>${STATUS_LABELS[row.status] || row.status}</td>
+                    <td>${escapeHtml(LEAVE_HISTORY_LABELS[row.request_type] || row.request_type)}</td>
+                    <td>${escapeHtml(STATUS_LABELS[row.status] || row.status)}</td>
                     <td>${d0}</td>
                     <td>${d1}</td>
                     <td>${amount}</td>
@@ -2089,7 +2090,7 @@
 
             if (error) {
                 console.error("ERRORE STORICO:", error);
-                punchesTableContainer.innerHTML = `<p class="state-msg state-msg--error">Errore caricamento storico: ${error.message}</p>`;
+                punchesTableContainer.innerHTML = `<p class="state-msg state-msg--error">Errore caricamento storico: ${escapeHtml(error.message)}</p>`;
                 updateMonthlySummary(null, 0, 0, 0, trasfertaExtraMinutes);
                 return;
             }
@@ -2149,7 +2150,7 @@
             // timbrature e dei giorni coperti da una richiesta.
             const allDates = Array.from(new Set([...list.map(p => p.punch_date), ...Object.keys(requestsByDate)])).sort();
 
-            const fmt = (t) => (t && String(t).trim() !== "" ? normalizeTimeForInput(t) : "-");
+            const fmt = (t) => (t && String(t).trim() !== "" ? escapeHtml(normalizeTimeForInput(t)) : "-");
 
             allDates.forEach(dateStr => {
                 const punch = punchByDate[dateStr];
@@ -2185,7 +2186,7 @@
                     // Un giorno può avere sia timbrature sia una richiesta che lo copre
                     // (es. trasferta con orario parziale registrato): lo segnaliamo comunque.
                     const badge = req
-                        ? ` <span style="font-size:0.72rem;font-weight:600;color:${REQUEST_TYPE_COLORS[req.request_type] || '#6b7280'};">(${REQUEST_TYPE_LABELS[req.request_type] || req.request_type})</span>`
+                        ? ` <span style="font-size:0.72rem;font-weight:600;color:${REQUEST_TYPE_COLORS[req.request_type] || '#6b7280'};">(${escapeHtml(REQUEST_TYPE_LABELS[req.request_type] || req.request_type)})</span>`
                         : '';
 
                     tableHtml += `
@@ -2195,7 +2196,7 @@
                             <td>${fmt(punch.finemattina)}</td>
                             <td>${fmt(punch.iniziopomeriggio)}</td>
                             <td>${fmt(punch.finepomeriggio)}</td>
-                            <td>${punch.pausa_minuti || '0'}</td>
+                            <td>${escapeHtml(punch.pausa_minuti || '0')}</td>
                             <td style="font-weight: 500;">${workedHHMM}</td>
                             <td style="background-color: #fef3c7; ${extraStyle}">${extraHHMM}</td>
                         </tr>
@@ -2203,8 +2204,8 @@
                 } else if (req) {
                     // Giorno senza alcuna timbratura ma coperto da una richiesta
                     // (es. ferie): prima non compariva affatto nel calendario.
-                    const typeLabel = REQUEST_TYPE_LABELS[req.request_type] || req.request_type;
-                    const statusLabel = STATUS_LABELS[req.status] || req.status;
+                    const typeLabel = escapeHtml(REQUEST_TYPE_LABELS[req.request_type] || req.request_type);
+                    const statusLabel = escapeHtml(STATUS_LABELS[req.status] || req.status);
                     const rowBg = REQUEST_ROW_BG[req.status] || '#f3f4f6';
                     tableHtml += `
                         <tr style="background-color: ${rowBg};">
@@ -2347,7 +2348,7 @@
 
             if (error) {
                 console.error("ERRORE CARICAMENTO PROFILI:", error);
-                profilesUl.innerHTML = `<li class="state-msg state-msg--error">Errore: ${error.message}</li>`;
+                profilesUl.innerHTML = `<li class="state-msg state-msg--error">Errore: ${escapeHtml(error.message)}</li>`;
                 return;
             }
 
@@ -2360,10 +2361,10 @@
                 const isAdminBadge = profile.is_admin ? '<span style="background-color: #f97316; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 10px;">ADMIN</span>' : '';
                 return `
                     <li>
-                        <div class="clickable-uid" data-user-id="${profile.id}" data-user-name="${profile.first_name} ${profile.last_name}">
-                            ${profile.first_name} ${profile.last_name} (${profile.email})
+                        <div class="clickable-uid" data-user-id="${escapeHtml(profile.id)}" data-user-name="${escapeHtml(`${profile.first_name} ${profile.last_name}`)}">
+                            ${escapeHtml(profile.first_name)} ${escapeHtml(profile.last_name)} (${escapeHtml(profile.email)})
                         </div>
-                        <span style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px; display: block;">UID: ${profile.id.substring(0, 8)}...</span>
+                        <span style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px; display: block;">UID: ${escapeHtml(profile.id.substring(0, 8))}...</span>
                         ${isAdminBadge}
                     </li>
                 `;
@@ -2418,7 +2419,7 @@
             }
             const previousValue = leaveBalanceEmployeeSelect.value;
             leaveBalanceEmployeeSelect.innerHTML = (data || [])
-                .map(p => `<option value="${p.id}">${p.first_name || ''} ${p.last_name || ''} (${p.email})</option>`)
+                .map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.first_name || '')} ${escapeHtml(p.last_name || '')} (${escapeHtml(p.email)})</option>`)
                 .join('');
             if (previousValue && (data || []).some(p => p.id === previousValue)) {
                 leaveBalanceEmployeeSelect.value = previousValue;
@@ -2552,7 +2553,7 @@
             const loadError = profilesError || punchesError;
             if (loadError) {
                 console.error("ERRORE CARICAMENTO PRESENZE:", loadError);
-                todayPresenceUl.innerHTML = `<li class="state-msg state-msg--error">Errore: ${loadError.message}</li>`;
+                todayPresenceUl.innerHTML = `<li class="state-msg state-msg--error">Errore: ${escapeHtml(loadError.message)}</li>`;
                 if (todayPresenceSummaryEl) todayPresenceSummaryEl.innerHTML = '';
                 return;
             }
@@ -2589,10 +2590,10 @@
                 const style = PRESENCE_STYLES[r.status];
                 return `
                     <li style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid #e5e7eb;">
-                        <span>${r.name}</span>
+                        <span>${escapeHtml(r.name)}</span>
                         <span style="display:inline-flex; align-items:center; gap:6px; font-size:0.8rem; color:${style.text}; font-weight:600; white-space:nowrap;">
                             <span style="width:8px; height:8px; border-radius:50%; background:${style.dot}; display:inline-block;"></span>
-                            ${style.label}${r.time ? ` · ${r.time}` : ''}
+                            ${style.label}${r.time ? ` · ${escapeHtml(r.time)}` : ''}
                         </span>
                     </li>
                 `;
@@ -2611,7 +2612,7 @@
 
             if (error) {
                 console.error("ERRORE CARICAMENTO RICHIESTE:", error);
-                pendingRequestsUl.innerHTML = `<li class="state-msg state-msg--error">Errore: ${error.message}</li>`;
+                pendingRequestsUl.innerHTML = `<li class="state-msg state-msg--error">Errore: ${escapeHtml(error.message)}</li>`;
                 return;
             }
 
@@ -2630,7 +2631,7 @@
             pendingRequestsUl.innerHTML = requests.map(req => {
                 const profile = profileById[req.user_id];
                 const employeeName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email : req.user_id;
-                const tipo = REQUEST_TYPE_LABELS[req.request_type] || req.request_type;
+                const tipo = escapeHtml(REQUEST_TYPE_LABELS[req.request_type] || req.request_type);
                 const d0 = new Date(req.start_date).toLocaleDateString('it-IT');
                 const d1 = new Date(req.end_date).toLocaleDateString('it-IT');
                 let extra = '';
@@ -2643,17 +2644,17 @@
                     extra = ` — ${req.total_hours_declared} ore`;
                 }
                 const note = req.note
-                    ? `<div style="font-size:0.8rem;color:#6b7280;margin-top:2px;">${String(req.note).slice(0, 150)}</div>`
+                    ? `<div style="font-size:0.8rem;color:#6b7280;margin-top:2px;">${escapeHtml(String(req.note).slice(0, 150))}</div>`
                     : '';
                 return `
                     <li style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;">
                         <div>
-                            <strong>${employeeName}</strong> — ${tipo}${extra}: ${d0} – ${d1}
+                            <strong>${escapeHtml(employeeName)}</strong> — ${tipo}${extra}: ${d0} – ${d1}
                             ${note}
                         </div>
                         <div style="display:flex; gap:8px; flex-shrink:0;">
-                            <button type="button" class="approve-request-btn" data-request-id="${req.id}" style="background-color:#16a34a; color:white; padding:6px 12px; border-radius:6px; font-size:0.85rem;">Approva</button>
-                            <button type="button" class="reject-request-btn" data-request-id="${req.id}" style="background-color:#dc2626; color:white; padding:6px 12px; border-radius:6px; font-size:0.85rem;">Rifiuta</button>
+                            <button type="button" class="approve-request-btn" data-request-id="${escapeHtml(req.id)}" style="background-color:#16a34a; color:white; padding:6px 12px; border-radius:6px; font-size:0.85rem;">Approva</button>
+                            <button type="button" class="reject-request-btn" data-request-id="${escapeHtml(req.id)}" style="background-color:#dc2626; color:white; padding:6px 12px; border-radius:6px; font-size:0.85rem;">Rifiuta</button>
                         </div>
                     </li>
                 `;
