@@ -111,6 +111,42 @@ export function minutesToHHMM(totalMinutes) {
     return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+/** True se il campo di timbratura è valorizzato (anche "00:00"). */
+function hasPunchValue(punch, field) {
+    return !!(punch && punch[field] && String(punch[field]).trim());
+}
+
+/**
+ * Classifica una giornata di timbrature SENZA toccare i totali: serve solo a
+ * segnalare le giornate sospette (vedi tabella ore in index.html).
+ * @param {object|null} punch - riga daily_punches.
+ * @returns {{stato: 'vuota'|'aperta'|'continuata'|'completa'|'parziale',
+ *            pausaNonRegistrata: boolean, aperta: boolean, anomalie: string[]}}
+ *  - 'aperta': solo ingresso (manca l'uscita e non c'è altro).
+ *  - 'continuata': solo ingresso + uscita, nessuna pausa registrata.
+ *  - 'completa': tutte e quattro le timbrature.
+ *  - 'parziale': qualunque altra combinazione incompleta (es. manca l'uscita dopo la pausa).
+ */
+export function analyzeDay(punch) {
+    const inM = hasPunchValue(punch, 'iniziomattina');
+    const fm = hasPunchValue(punch, 'finemattina');
+    const ip = hasPunchValue(punch, 'iniziopomeriggio');
+    const fp = hasPunchValue(punch, 'finepomeriggio');
+
+    let stato = 'parziale';
+    if (!inM && !fm && !ip && !fp) stato = 'vuota';
+    else if (inM && fm && ip && fp) stato = 'completa';
+    else if (inM && fp && !fm && !ip) stato = 'continuata';
+    else if (inM && !fm && !ip && !fp) stato = 'aperta';
+
+    return {
+        stato,
+        pausaNonRegistrata: stato === 'continuata',
+        aperta: stato === 'aperta',
+        anomalie: analyzePunchNonConformity(punch),
+    };
+}
+
 /**
  * Calcola i minuti effettivi lavorati (spezzato) O la durata lorda (continuato).
  * @param {object} punch - Dati di timbratura giornaliera.
@@ -120,16 +156,21 @@ export function calculateWorkMinutes(punch) {
     const endMorning = timeToMinutes(punch.finemattina);
     const startAfternoon = timeToMinutes(punch.iniziopomeriggio);
     const endAfternoon = timeToMinutes(punch.finepomeriggio);
+    // Presenza della timbratura: "00:00" è un orario valido (mezzanotte), non un campo vuoto.
+    const hasStartMorning = hasPunchValue(punch, 'iniziomattina');
+    const hasEndMorning = hasPunchValue(punch, 'finemattina');
+    const hasStartAfternoon = hasPunchValue(punch, 'iniziopomeriggio');
+    const hasEndAfternoon = hasPunchValue(punch, 'finepomeriggio');
 
     let morningWork = 0;
     let afternoonWork = 0;
     // Calcola il segmento mattina
-    if (startMorning > 0 && endMorning > 0) {
+    if (hasStartMorning && hasEndMorning) {
          morningWork = endMorning - startMorning;
     }
 
     // Calcola il segmento pomeriggio
-    if (startAfternoon > 0 && endAfternoon > 0) {
+    if (hasStartAfternoon && hasEndAfternoon) {
          afternoonWork = endAfternoon - startAfternoon;
     }
 
@@ -138,7 +179,7 @@ export function calculateWorkMinutes(punch) {
     // Se il lavoro spezzato è zero (o incompleto) ma ci sono Inizio Mattina e Fine Pomeriggio (2 punch),
     // calcola la durata totale.
     // (Questo copre i giorni da 13 ore).
-    if (totalWork === 0 && startMorning > 0 && endAfternoon > 0) {
+    if (totalWork === 0 && hasStartMorning && hasEndAfternoon) {
          totalWork = endAfternoon - startMorning;
     }
 

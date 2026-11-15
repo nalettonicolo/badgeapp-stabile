@@ -13,6 +13,7 @@ import {
   analyzePunchNonConformity,
   minutesToHHMM,
   calculateWorkMinutes,
+  analyzeDay,
   inclusiveCalendarDays,
   overlapDaysInMonthRange,
   haversineDistanceMeters,
@@ -185,6 +186,35 @@ test('calculateWorkMinutes calcola la durata lorda su giornata continuata (solo 
 test('calculateWorkMinutes non va mai sotto zero anche con orari incoerenti', () => {
   const minutes = calculateWorkMinutes({ iniziomattina: '17:00', finemattina: '08:00' });
   assert.equal(minutes, 0);
+});
+
+test('calculateWorkMinutes tratta 00:00 come orario valido, non come campo vuoto', () => {
+  assert.equal(calculateWorkMinutes({ iniziomattina: '00:00', finepomeriggio: '08:00' }), 8 * 60);
+  assert.equal(calculateWorkMinutes({ iniziomattina: '00:00', finemattina: '04:00' }), 4 * 60);
+  assert.equal(calculateWorkMinutes({ iniziomattina: '', finepomeriggio: null }), 0);
+});
+
+test('analyzeDay segnala pausa non registrata (solo ingresso e uscita)', () => {
+  const r = analyzeDay({ iniziomattina: '08:00', finepomeriggio: '17:00' });
+  assert.equal(r.stato, 'continuata');
+  assert.equal(r.pausaNonRegistrata, true);
+  assert.equal(r.aperta, false);
+});
+
+test('analyzeDay segnala giornata aperta (solo ingresso)', () => {
+  const r = analyzeDay({ iniziomattina: '08:00' });
+  assert.equal(r.stato, 'aperta');
+  assert.equal(r.aperta, true);
+  assert.equal(r.pausaNonRegistrata, false);
+});
+
+test('analyzeDay: giornata completa, parziale e vuota non sono segnalate come pausa mancante/aperta', () => {
+  const full = analyzeDay({ iniziomattina: '08:00', finemattina: '12:00', iniziopomeriggio: '13:00', finepomeriggio: '17:00' });
+  assert.equal(full.stato, 'completa');
+  assert.equal(full.pausaNonRegistrata, false);
+  assert.equal(analyzeDay({ iniziomattina: '08:00', finemattina: '12:00' }).stato, 'parziale');
+  assert.equal(analyzeDay(null).stato, 'vuota');
+  assert.equal(analyzeDay({ iniziomattina: '00:00', finepomeriggio: '08:00' }).pausaNonRegistrata, true);
 });
 
 test('inclusiveCalendarDays conta i giorni includendo entrambi gli estremi', () => {
