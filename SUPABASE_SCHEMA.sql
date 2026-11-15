@@ -533,9 +533,15 @@ $$;
 -- is_admin = false. Il flusso "admin crea un altro admin" nell'app continua a
 -- funzionare senza modifiche al client: dopo la signup, il form esegue già un
 -- upsert su public.profiles con is_admin = true usando la SESSIONE
--- DELL'ADMIN — upsert soggetto alla RLS profiles_update_admin_all, che
--- verifica server-side che il chiamante sia davvero un admin. Solo quel
--- percorso, verificato, può ora impostare is_admin = true.
+-- DELL'ADMIN.
+--
+-- ATTENZIONE: questo fix da solo NON basta. La policy profiles_update_own
+-- (USING/WITH CHECK auth.uid() = id) lascia a OGNI utente aggiornare la propria
+-- riga, colonna is_admin compresa: la RLS non distingue le colonne. Quindi un
+-- utente normale poteva ancora promuoversi ad admin con un UPDATE diretto sul
+-- proprio profilo. Il blocco vero, lato server, è il trigger
+-- profiles_blocca_is_admin della sezione 15 in fondo a questo file: solo un
+-- admin (o un'operazione senza sessione utente) può cambiare is_admin.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
 RETURNS trigger
@@ -1038,6 +1044,100 @@ BEGIN
   END IF;
 END
 $$;
+
+-- -----------------------------------------------------------------------------
+-- 15) Blocco privilegi lato database (stesso contenuto di
+--     supabase/migrations/20261115_blocca_privilegi.sql — tenere allineati).
+--
+-- La RLS controlla le righe, non le colonne: un utente può aggiornare la propria
+-- riga di profiles / employee_requests / daily_punches. Questi trigger valgono
+-- solo per chi ha una sessione utente NON admin; restano liberi gli admin e le
+-- operazioni senza sessione (SQL Editor, service_role: auth.uid() nullo).
+--   a) profiles: solo un admin cambia is_admin.
+--   b) employee_requests: solo un admin porta status a approved/rejected
+--      (anche in INSERT, per non aggirare la regola creando righe già approvate).
+--   c) audit_log: si registra anche la modifica dei PROPRI orari già compilati,
+--      di qualunque giorno (action = 'UPDATE_OWN'); compilare un orario vuoto
+--      non genera log. Nessun blocco sulle date: il dipendente può correggere
+--      i giorni passati (decisione di Nicolò), la correzione resta tracciata.
+-- Per annullare: vedi il blocco "ANNULLAMENTO" nella migrazione.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.blocca_cambio_is_admin()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_actor uuid := auth.uid();
+BEGIN
+  IF NEW.is_admin IS DISTINCT FROM OLD.is_admin
+     AND v_actor IS NOT NULL
+     AND NOT public.is_admin(v_actor) THEN
+    RAISE EXCEPTION 'Solo un amministratore può cambiare il ruolo di amministratore.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profiles_blocca_is_admin ON public.profiles;
+CREATE TRIGGER profiles_blocca_is_admin
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.blocca_cambio_is_admin();
+
+CREATE OR REPLACE FUNCTION public.blocca_stato_richieste()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_actor uuid := auth.uid();
+BEGIN
+  IF NEW.status IN ('approved', 'rejected')
+     AND (TG_OP = 'INSERT' OR NEW.status IS DISTINCT FROM OLD.status)
+     AND v_actor IS NOT NULL
+     AND NOT public.is_admin(v_actor) THEN
+    RAISE EXCEPTION 'Solo un amministratore può approvare o rifiutare una richiesta.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS employee_requests_blocca_stato ON public.employee_requests;
+CREATE TRIGGER employee_requests_blocca_stato
+  BEFORE INSERT OR UPDATE ON public.employee_requests
+  FOR EACH ROW EXECUTE FUNCTION public.blocca_stato_richieste();
+
+CREATE OR REPLACE FUNCTION public.log_modifica_propri_orari()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor uuid := auth.uid();
+BEGIN
+  IF v_actor IS NULL OR v_actor IS DISTINCT FROM NEW.user_id THEN
+    RETURN NEW;
+  END IF;
+
+  IF (OLD.iniziomattina    IS NOT NULL AND NEW.iniziomattina    IS DISTINCT FROM OLD.iniziomattina)
+     OR (OLD.finemattina      IS NOT NULL AND NEW.finemattina      IS DISTINCT FROM OLD.finemattina)
+     OR (OLD.iniziopomeriggio IS NOT NULL AND NEW.iniziopomeriggio IS DISTINCT FROM OLD.iniziopomeriggio)
+     OR (OLD.finepomeriggio   IS NOT NULL AND NEW.finepomeriggio   IS DISTINCT FROM OLD.finepomeriggio) THEN
+    INSERT INTO public.audit_log (actor_id, action, table_name, row_id, target_user_id, old_data, new_data)
+    VALUES (v_actor, 'UPDATE_OWN', TG_TABLE_NAME, NEW.id::text, NEW.user_id, to_jsonb(OLD), to_jsonb(NEW));
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS audit_daily_punches_own ON public.daily_punches;
+CREATE TRIGGER audit_daily_punches_own
+  AFTER UPDATE ON public.daily_punches
+  FOR EACH ROW EXECUTE FUNCTION public.log_modifica_propri_orari();
 
 -- =============================================================================
 -- Fine
