@@ -7,6 +7,19 @@
  * (timeToMinutes / calcolo pausa), riportate qui per il web.
  */
 
+/**
+ * Escape HTML per testo (e valori di attributo tra virgolette) inseriti in
+ * innerHTML: nomi, email, note, messaggi d'errore. null/undefined → stringa vuota.
+ */
+export function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 /** Errore di rete / fetch (non RLS): messaggio utente diverso da policy DB */
 export function isLikelyNetworkError(err) {
     const m = String(err?.message ?? err ?? "");

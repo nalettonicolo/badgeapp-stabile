@@ -21,8 +21,14 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 // senza gestire la preflight OPTIONS, il browser blocca la risposta ancora
 // prima che arrivi al codice della pagina — la funzione fallirebbe sempre,
 // indipendentemente da ANTHROPIC_API_KEY.
+// L'origine ammessa è solo il dominio dell'app (secret/variabile APP_ORIGIN
+// sul progetto Supabase); se non impostata vale il dominio di produzione
+// (stesso di supabase-config.js). Mai "*": altri siti non devono poter
+// chiamare la funzione dal browser di un utente loggato.
+const APP_ORIGIN = Deno.env.get("APP_ORIGIN") || "https://timbratureonline.netlify.app";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": APP_ORIGIN,
+  "Vary": "Origin",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
