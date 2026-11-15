@@ -194,6 +194,21 @@ test('calculateWorkMinutes tratta 00:00 come orario valido, non come campo vuoto
   assert.equal(calculateWorkMinutes({ iniziomattina: '', finepomeriggio: null }), 0);
 });
 
+test('calculateWorkMinutes: valori non validi restano ignorati come prima (non diventano 00:00)', () => {
+  assert.equal(calculateWorkMinutes({ iniziomattina: 'abc', finepomeriggio: '17:00' }), 0);
+  assert.equal(calculateWorkMinutes({ iniziomattina: '-', finemattina: '12:00' }), 0);
+  assert.equal(calculateWorkMinutes({ iniziomattina: '08:00', finepomeriggio: 'abc' }), 0);
+});
+
+test('calculateWorkMinutes: 00:00 come fine non produce minuti negativi', () => {
+  assert.equal(calculateWorkMinutes({ iniziomattina: '08:00', finemattina: '00:00' }), 0);
+  assert.equal(
+    calculateWorkMinutes({ iniziomattina: '08:00', finemattina: '00:00', iniziopomeriggio: '13:00', finepomeriggio: '17:00' }),
+    4 * 60
+  );
+  assert.equal(calculateWorkMinutes({ iniziomattina: '08:00', finepomeriggio: '00:00' }), 0);
+});
+
 test('analyzeDay segnala pausa non registrata (solo ingresso e uscita)', () => {
   const r = analyzeDay({ iniziomattina: '08:00', finepomeriggio: '17:00' });
   assert.equal(r.stato, 'continuata');
