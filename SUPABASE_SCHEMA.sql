@@ -1056,9 +1056,10 @@ $$;
 --   a) profiles: solo un admin cambia is_admin.
 --   b) employee_requests: solo un admin porta status a approved/rejected
 --      (anche in INSERT, per non aggirare la regola creando righe già approvate).
---   c) daily_punches: un non admin modifica solo il giorno corrente (Europe/Rome).
---   d) audit_log: si registra anche la modifica dei PROPRI orari già compilati
---      (action = 'UPDATE_OWN'); compilare un orario vuoto non genera log.
+--   c) audit_log: si registra anche la modifica dei PROPRI orari già compilati,
+--      di qualunque giorno (action = 'UPDATE_OWN'); compilare un orario vuoto
+--      non genera log. Nessun blocco sulle date: il dipendente può correggere
+--      i giorni passati (decisione di Nicolò), la correzione resta tracciata.
 -- Per annullare: vedi il blocco "ANNULLAMENTO" nella migrazione.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.blocca_cambio_is_admin()
@@ -1107,32 +1108,6 @@ DROP TRIGGER IF EXISTS employee_requests_blocca_stato ON public.employee_request
 CREATE TRIGGER employee_requests_blocca_stato
   BEFORE INSERT OR UPDATE ON public.employee_requests
   FOR EACH ROW EXECUTE FUNCTION public.blocca_stato_richieste();
-
-CREATE OR REPLACE FUNCTION public.limita_modifica_timbrature()
-RETURNS trigger
-LANGUAGE plpgsql
-SET search_path = public
-AS $$
-DECLARE
-  v_actor uuid := auth.uid();
-  v_oggi date := (now() AT TIME ZONE 'Europe/Rome')::date;
-BEGIN
-  IF OLD.punch_date = v_oggi AND NEW.punch_date = v_oggi THEN
-    RETURN NEW;
-  END IF;
-
-  IF v_actor IS NOT NULL AND NOT public.is_admin(v_actor) THEN
-    RAISE EXCEPTION 'Puoi modificare solo le timbrature di oggi: per correggere un giorno passato rivolgiti a un amministratore.'
-      USING ERRCODE = '42501';
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS daily_punches_limita_modifica ON public.daily_punches;
-CREATE TRIGGER daily_punches_limita_modifica
-  BEFORE UPDATE ON public.daily_punches
-  FOR EACH ROW EXECUTE FUNCTION public.limita_modifica_timbrature();
 
 CREATE OR REPLACE FUNCTION public.log_modifica_propri_orari()
 RETURNS trigger

@@ -9,9 +9,10 @@
 -- Perché: le policy RLS "profiles_update_own" e "employee_requests_update_own"
 -- consentono a ogni utente di aggiornare la PROPRIA riga, ma la RLS controlla
 -- le righe, non le colonne. Quindi, chiamando direttamente l'API con la propria
--- sessione, un dipendente poteva: diventare admin (is_admin = true), approvarsi
--- da solo una richiesta (status = 'approved') e riscrivere le timbrature di
--- giorni passati. Questi trigger chiudono i buchi.
+-- sessione, un dipendente poteva diventare admin (is_admin = true) o approvarsi
+-- da solo una richiesta (status = 'approved'). Questi trigger chiudono i buchi.
+-- Le timbrature dei giorni passati restano correggibili dal dipendente (scelta
+-- di Nicolò): il controllo è la tracciatura nel registro (regola 3).
 --
 -- Regola comune: i controlli valgono solo per chi ha una sessione utente
 -- (auth.uid() non nullo) che NON è admin. Restano liberi:
@@ -22,10 +23,9 @@
 -- Regole:
 --   1) profiles: solo un admin può cambiare is_admin.
 --   2) employee_requests: solo un admin può portare status a approved/rejected.
---   3) daily_punches: un non admin può modificare solo le timbrature di OGGI
---      (giorno di Europe/Rome); le correzioni sui giorni passati le fa l'admin.
---   4) audit_log: si registra anche quando un utente MODIFICA i propri orari
---      già inseriti (prima si loggavano solo le modifiche su dati altrui).
+--   3) audit_log: si registra anche quando un utente MODIFICA i propri orari
+--      già inseriti, di qualunque giorno (prima si loggavano solo le modifiche
+--      su dati altrui). Nessun blocco sulle date: nessuna regola sul giorno.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -107,43 +107,10 @@ CREATE TRIGGER employee_requests_blocca_stato
   FOR EACH ROW EXECUTE FUNCTION public.blocca_stato_richieste();
 
 -- -----------------------------------------------------------------------------
--- 3) daily_punches: un non admin modifica solo il giorno corrente
---    "Giorno corrente" = data di oggi in Europe/Rome (non UTC, altrimenti dopo
---    mezzanotte italiana ma prima di mezzanotte UTC il giorno sarebbe sbagliato).
---    Si controllano sia la data vecchia sia la nuova, così non si può nemmeno
---    "spostare" una timbratura da o verso un giorno passato.
---    Un trigger (e non una policy RLS) dà un errore esplicito: con la sola RLS
---    un UPDATE non consentito sarebbe un'operazione vuota senza avviso.
---    Nota: riguarda solo l'UPDATE; l'INSERT di un giorno mancante resta com'è.
--- -----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.limita_modifica_timbrature()
-RETURNS trigger
-LANGUAGE plpgsql
-SET search_path = public
-AS $$
-DECLARE
-  v_actor uuid := auth.uid();
-  v_oggi date := (now() AT TIME ZONE 'Europe/Rome')::date;
-BEGIN
-  IF OLD.punch_date = v_oggi AND NEW.punch_date = v_oggi THEN
-    RETURN NEW;
-  END IF;
-
-  IF v_actor IS NOT NULL AND NOT public.is_admin(v_actor) THEN
-    RAISE EXCEPTION 'Puoi modificare solo le timbrature di oggi: per correggere un giorno passato rivolgiti a un amministratore.'
-      USING ERRCODE = '42501';
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS daily_punches_limita_modifica ON public.daily_punches;
-CREATE TRIGGER daily_punches_limita_modifica
-  BEFORE UPDATE ON public.daily_punches
-  FOR EACH ROW EXECUTE FUNCTION public.limita_modifica_timbrature();
-
--- -----------------------------------------------------------------------------
--- 4) audit_log: registra anche le modifiche ai PROPRI orari
+-- 3) audit_log: registra anche le modifiche ai PROPRI orari (anche passati)
+--    Il dipendente può correggere i giorni passati dall'app (decisione di
+--    Nicolò), quindi non c'è un blocco sulla data: ogni correzione resta però
+--    tracciata con vecchio e nuovo valore, e l'admin la vede nel registro.
 --    Il trigger esistente (log_on_behalf_of_change) salta i casi in cui chi
 --    agisce è il proprietario della riga. Questo trigger copre solo quel caso e
 --    scrive una riga con action = 'UPDATE_OWN' quando un orario GIÀ compilato
@@ -191,11 +158,9 @@ CREATE TRIGGER audit_daily_punches_own
 -- action = 'UPDATE_OWN' restano.
 --
 -- DROP TRIGGER IF EXISTS audit_daily_punches_own ON public.daily_punches;
--- DROP TRIGGER IF EXISTS daily_punches_limita_modifica ON public.daily_punches;
 -- DROP TRIGGER IF EXISTS employee_requests_blocca_stato ON public.employee_requests;
 -- DROP TRIGGER IF EXISTS profiles_blocca_is_admin ON public.profiles;
 -- DROP FUNCTION IF EXISTS public.log_modifica_propri_orari();
--- DROP FUNCTION IF EXISTS public.limita_modifica_timbrature();
 -- DROP FUNCTION IF EXISTS public.blocca_stato_richieste();
 -- DROP FUNCTION IF EXISTS public.blocca_cambio_is_admin();
 -- =============================================================================
