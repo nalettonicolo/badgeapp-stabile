@@ -8,16 +8,52 @@
  * 1. Token di design (chiaro; la sezione 6 li ridefinisce per lo scuro)
  * ------------------------------------------------ */
 :root {
+    /* Un solo accento blu (#1d4ed8, lo stesso dell'icona "T su blu" e dell'app
+     * mobile). --brand-ink è lo stesso blu usato come COLORE DEL TESTO: nello
+     * scuro si schiarisce per mantenere il contrasto 4,5:1. */
     --brand: #1d4ed8;
     --brand-dark: #1e3a8a;
+    --brand-ink: #1d4ed8;
+    --brand-tint: #eff6ff;
+    --brand-tint-line: #bfdbfe;
     --ink: #0f172a;
-    --muted: #64748b;
+    /* Testo secondario: ≥ 4,5:1 su bianco, sulle tinte blu/gialle e sullo sfondo. */
+    --muted: #55657a;
     --line: #e2e8f0;
-    --panel: rgba(255, 255, 255, 0.94);
+    --bg: #f1f5f9;
+    --panel: #ffffff;
     --panel-flat: #f9fafb;
     --field-bg: #f8fafc;
-    --danger: #dc2626;
+    --readonly-bg: #e5e7eb;
+    --pause-bg: #dbeafe;
+    --danger: #b91c1c;
+    --danger-ink: var(--danger); /* rosso usato come testo: nello scuro si schiarisce */
     --danger-bg: #fef2f2;
+    --ok: #047857;
+    --warn: #b45309;
+
+    /* Tipi di richiesta (malattia/trasferta/ferie/permesso/ROL): stessi colori
+     * per pulsanti, etichette dello storico e righe del calendario. Tutti con
+     * testo bianco ≥ 4,5:1 e leggibili anche come testo su fondo chiaro. */
+    --req-malattia: #e11d48;
+    --req-trasferta: #c2410c;
+    --req-ferie: #0f766e;
+    --req-permesso: var(--brand);
+    --req-rol: #7c3aed;
+    /* Versione "testo" degli stessi colori (etichette e badge): nello scuro si schiariscono. */
+    --req-malattia-ink: var(--req-malattia);
+    --req-trasferta-ink: var(--req-trasferta);
+    --req-ferie-ink: var(--req-ferie);
+    --req-permesso-ink: var(--brand-ink);
+    --req-rol-ink: var(--req-rol);
+    --req-row-pending: #fef9c3;
+    --req-row-approved: #dcfce7;
+    --req-row-none: #f3f4f6;
+
+    /* Colonna "Straordinario" dello storico */
+    --extra-bg: #fef3c7;
+    --extra-pos: #166534;
+    --extra-neg: #b91c1c;
 
     --space-1: 4px;
     --space-2: 8px;
@@ -32,9 +68,21 @@
     --radius-xl: 24px;
     --radius-pill: 9999px;
 
-    --shadow-card: 0 24px 70px rgba(15, 23, 42, 0.12);
+    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 28px rgba(15, 23, 42, 0.07);
     --shadow-modal: 0 30px 80px rgba(15, 23, 42, 0.28);
-    --shadow-btn: 0 10px 20px rgba(15, 23, 42, 0.10);
+    --shadow-btn: 0 2px 6px rgba(15, 23, 42, 0.12);
+}
+
+/* Inter: nessun file era incorporato (la regola font-family sotto funzionava
+ * solo con Inter installato sul dispositivo). Il file va messo in
+ * fonts/Inter-Variable.woff2 (licenza OFL); finché manca, il browser usa il
+ * carattere di sistema indicato nello stack, senza errori visibili. */
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: local("Inter"), local("Inter Variable"), url("fonts/Inter-Variable.woff2") format("woff2");
 }
 
 * { box-sizing: border-box; }
@@ -53,10 +101,16 @@ body {
     padding: var(--space-4) var(--space-2);
     line-height: 1.5;
     color: var(--ink);
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background:
-        radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 32rem),
-        linear-gradient(135deg, #eef2ff 0%, #f8fafc 45%, #ecfeff 100%);
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    /* Sfondo piatto (come l'app mobile): prima sfumatura indaco/azzurro/ciano
+     * senza significato, tipica dei modelli generici. */
+    background: var(--bg);
+}
+
+/* Orari e ore: cifre di larghezza fissa, così le colonne restano allineate
+ * come sul cartellino di un marcatempo. */
+input[type="time"], #history-view table, #monthly-summary, #pausaPranzoInput {
+    font-variant-numeric: tabular-nums;
 }
 
 h1, h2, h3 {
@@ -94,11 +148,11 @@ h1, h2, h3 {
     padding: var(--space-3) 0;
 }
 .state-msg--error {
-    color: var(--danger);
+    color: var(--danger-ink);
 }
 
 input:read-only {
-    background-color: #e5e7eb;
+    background-color: var(--readonly-bg);
     color: var(--muted);
     cursor: default;
     border: 1px solid var(--line);
@@ -116,9 +170,13 @@ input[type="time"], input[type="date"], select {
     outline: none;
     font: inherit;
 }
-input:focus, select:focus {
-    border-color: #93c5fd;
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
+/* Focus da tastiera ben visibile (WCAG 2.4.7 / 1.4.11): prima solo un alone
+ * al 14% di opacità, quasi invisibile. */
+input:focus, select:focus, textarea:focus {
+    border-color: var(--brand-ink);
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+    box-shadow: 0 0 0 3px var(--brand-ink);
 }
 
 button {
@@ -129,12 +187,14 @@ button {
     font-weight: 600;
     font: inherit;
     box-shadow: var(--shadow-btn);
-    transition: opacity 0.2s, box-shadow 0.2s;
+    transition: opacity 0.2s, box-shadow 0.2s, transform 0.12s ease-out;
 }
 button:hover:not(:disabled) { opacity: 0.9; }
+/* Stato "premuto": risposta immediata al tocco. */
+button:active:not(:disabled) { transform: scale(0.98); }
 button:disabled { background-color: #9ca3af !important; cursor: not-allowed; box-shadow: none; }
 button:focus-visible {
-    outline: 3px solid rgba(37, 99, 235, 0.25);
+    outline: 3px solid var(--brand-ink);
     outline-offset: 2px;
 }
 
@@ -147,6 +207,49 @@ button:focus-visible {
     color: #fff;
 }
 
+/* Varianti di colore dei bottoni (prima scritte come stile inline nei tag,
+ * con tinte chiare che non raggiungevano il contrasto 4,5:1 col testo bianco). */
+.btn-brand { background-color: var(--brand); color: #fff; }
+.btn-ok { background-color: var(--ok); color: #fff; }
+.btn-warn { background-color: var(--warn); color: #fff; }
+.btn-danger { background-color: var(--danger); color: #fff; }
+.btn-malattia { background-color: var(--req-malattia); color: #fff; }
+.btn-trasferta { background-color: var(--req-trasferta); color: #fff; }
+.btn-ferie { background-color: var(--req-ferie); color: #fff; }
+.btn-rol { background-color: var(--req-rol); color: #fff; }
+
+/* Conferma di timbratura: breve "battito" del bottone dopo il salvataggio. */
+@keyframes punch-confirm {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.03); }
+    100% { transform: scale(1); }
+}
+#timbraBtn.punch-confirm { animation: punch-confirm 0.35s ease-out; }
+
+/* Messaggio di esito (prima stile inline): compare dall'alto, resta ~3 s ed
+ * esce dissolvendosi; lo script lo rimuove dopo 3 s. */
+@keyframes toast-life {
+    0% { opacity: 0; transform: translateY(-8px); }
+    8% { opacity: 1; transform: none; }
+    90% { opacity: 1; transform: none; }
+    100% { opacity: 0; }
+}
+.toast {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    max-width: calc(100vw - 2rem);
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    color: #fff;
+    font-weight: 500;
+    z-index: 100;
+    animation: toast-life 3s ease-out forwards;
+}
+.toast--ok { background-color: var(--ok); }
+.toast--error { background-color: var(--danger); }
+
 /* Viste principali */
 #login-view, #punch-view, #history-view, #admin-view {
     width: 100%;
@@ -157,9 +260,18 @@ button:focus-visible {
     border-radius: var(--radius-xl);
     background: var(--panel);
     box-shadow: var(--shadow-card);
-    backdrop-filter: blur(14px);
 }
 #login-view { max-width: 400px; }
+
+/* Cambio scheda: la vista che appare entra con una breve dissolvenza. */
+@keyframes view-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+}
+#login-view:not(.hidden), #punch-view:not(.hidden),
+#history-view:not(.hidden), #admin-view:not(.hidden) {
+    animation: view-in 0.22s ease-out;
+}
 
 /* Bottone Admin Fisso */
 #fixed-admin-btn {
@@ -181,7 +293,6 @@ button:focus-visible {
     justify-content: center;
     padding: var(--space-2);
     background-color: rgba(15, 23, 42, 0.55);
-    backdrop-filter: blur(3px);
 }
 .modal-content {
     width: 400px;
@@ -191,8 +302,14 @@ button:focus-visible {
     border-radius: var(--radius-lg);
     background: var(--panel);
     box-shadow: var(--shadow-modal);
-    backdrop-filter: blur(14px);
 }
+@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}
+.modal:not(.hidden) { animation: modal-fade 0.18s ease-out; }
+.modal:not(.hidden) .modal-content { animation: modal-rise 0.22s ease-out; }
 
 /* ------------------------------------------------
  * 3. Viste specifiche (layout mobile-first)
@@ -244,7 +361,7 @@ button:focus-visible {
 
 .clickable-uid {
     cursor: pointer;
-    color: var(--brand);
+    color: var(--brand-ink);
     font-weight: 700 !important;
 }
 
@@ -266,15 +383,19 @@ button:focus-visible {
     border: 1px solid var(--line);
     text-align: center;
 }
-#history-view th { background: #eff6ff; color: var(--brand-dark); }
+#history-view th { background: var(--brand-tint); color: var(--brand-dark); }
+/* Colonna "Straordinario" e segno del valore (prima colori scritti nello script) */
+#history-view th.extra-col, #history-view td.extra-col { background-color: var(--extra-bg); }
+.extra-pos { color: var(--extra-pos); font-weight: bold; }
+.extra-neg { color: var(--extra-neg); }
 
 /* Riepilogo Mensile */
 #monthly-summary {
     margin-top: var(--space-5);
     padding: var(--space-4);
-    border: 2px solid #3b82f6;
+    border: 2px solid var(--brand);
     border-radius: var(--radius-md);
-    background-color: #eff6ff;
+    background-color: var(--brand-tint);
 }
 #monthly-summary h3 { font-size: 1.25rem; margin-bottom: var(--space-2); }
 #monthly-summary p { color: var(--muted); }
@@ -317,6 +438,9 @@ button:focus-visible {
 }
 .btn-timbrature:hover { opacity: 0.92; }
 
+/* Casella "Pausa pranzo": prima il colore era scritto nel tag. */
+#pausaPranzoInput { background-color: var(--pause-bg); color: var(--ink); }
+
 /* ------------------------------------------------
  * 4. Media Query (Layout Desktop/Tablet)
  * ------------------------------------------------ */
@@ -345,34 +469,72 @@ button:focus-visible {
 }
 
 /* ------------------------------------------------
+ * 4b. Bersagli da toccare di almeno 44 px (WCAG 2.5.8) su telefono/tablet
+ * ------------------------------------------------ */
+@media (max-width: 767px), (pointer: coarse) {
+    button,
+    input[type="email"], input[type="password"], input[type="text"],
+    input[type="time"], input[type="date"], input[type="number"], select {
+        min-height: 44px;
+    }
+    #add-punch-btn { min-width: 44px; }
+    /* "Vedi storico completo →": bottone che si presenta come link */
+    .btn-link { display: inline-flex; align-items: center; }
+}
+
+/* ------------------------------------------------
  * 5. Dark mode (prefers-color-scheme) — solo token colore/sfondo, nessuna
- * modifica a struttura, classi o animazioni. Segue il sistema operativo.
+ * modifica a struttura o classi. Segue il sistema operativo.
  * ------------------------------------------------ */
 @media (prefers-color-scheme: dark) {
     :root {
-        --brand: #3b82f6;
-        --brand-dark: #1e3a8a;
+        /* --brand resta #1d4ed8 (riempimento di bottoni col testo bianco);
+         * solo il blu usato come testo si schiarisce. */
+        --brand-ink: #93c5fd;
+        --brand-tint: rgba(59, 130, 246, 0.12);
+        --brand-tint-line: #1e3a8a;
         --ink: #e2e8f0;
         --muted: #94a3b8;
         --line: #334155;
-        --panel: rgba(15, 23, 42, 0.88);
+        --bg: #0b1220;
+        --panel: #0f172a;
         --panel-flat: rgba(30, 41, 59, 0.55);
         --field-bg: #0f172a;
-        --danger: #f87171;
+        --readonly-bg: #1e293b;
+        --pause-bg: rgba(59, 130, 246, 0.22);
+        --danger-ink: #f87171;
         --danger-bg: rgba(153, 27, 27, 0.25);
-        --shadow-card: 0 24px 70px rgba(0, 0, 0, 0.55);
+        --req-malattia-ink: #fb7185;
+        --req-trasferta-ink: #fb923c;
+        --req-ferie-ink: #2dd4bf;
+        --req-rol-ink: #a78bfa;
+        --req-row-pending: rgba(250, 204, 21, 0.14);
+        --req-row-approved: rgba(34, 197, 94, 0.16);
+        --req-row-none: rgba(148, 163, 184, 0.12);
+        --extra-bg: rgba(245, 158, 11, 0.16);
+        --extra-pos: #86efac;
+        --extra-neg: #fca5a5;
+        --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.35);
         --shadow-modal: 0 30px 80px rgba(0, 0, 0, 0.65);
-    }
-    body {
-        background:
-            radial-gradient(circle at top left, rgba(59, 130, 246, 0.20), transparent 32rem),
-            linear-gradient(135deg, #0b1220 0%, #0f172a 45%, #111827 100%);
     }
     #history-view table { background: #0f172a; }
     #history-view th { background: rgba(59, 130, 246, 0.18); color: #bfdbfe; }
-    #monthly-summary { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.10); }
+    #monthly-summary { border-color: var(--brand); }
     .nav-footer-timbrature {
         background: linear-gradient(to top, rgba(15, 23, 42, 0.96) 70%, rgba(15, 23, 42, 0));
     }
     .btn-timbrature { background-color: #374151; }
+}
+
+/* ------------------------------------------------
+ * 6. "Riduci movimento": nessuna animazione né spostamento (WCAG 2.3.3).
+ * Il messaggio di esito resta visibile (lo script lo toglie dopo 3 s).
+ * ------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+    #login-view, #punch-view, #history-view, #admin-view,
+    .modal, .modal .modal-content, .toast, #timbraBtn.punch-confirm {
+        animation: none !important;
+    }
+    button { transition: none; }
+    button:active:not(:disabled) { transform: none; }
 }

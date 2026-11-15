@@ -15,7 +15,7 @@ import type { RootStackParamList } from '../App';
 import { BackToTimbratureButton } from '../components/BackToTimbratureButton';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { base, colors, layout, radius, shadow, space, typography } from '../lib/theme';
+import { base, colors, layout, radius, shadow, space, touch, typography } from '../lib/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Requests'>;
 
@@ -368,6 +368,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: space.sm, marginBottom: space.md },
   chip: {
     flex: 1,
+    minHeight: touch.min,
+    justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     borderRadius: radius.md,
@@ -395,6 +397,8 @@ const styles = StyleSheet.create({
   scopeBtns: { flexDirection: 'row', gap: 6 },
   scopeChip: {
     flex: 1,
+    minHeight: touch.min,
+    justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     borderRadius: radius.md,
@@ -413,6 +417,8 @@ const styles = StyleSheet.create({
   },
   noteInput: { minHeight: 88, textAlignVertical: 'top' },
   saveBtn: {
+    minHeight: touch.min,
+    justifyContent: 'center',
     marginTop: space.sm,
     backgroundColor: colors.success,
     borderRadius: radius.lg,

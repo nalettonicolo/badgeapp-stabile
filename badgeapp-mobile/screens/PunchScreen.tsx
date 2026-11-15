@@ -22,7 +22,8 @@ import {
 } from '../lib/punch';
 import { supabase } from '../lib/supabase';
 import type { DailyPunchRow } from '../lib/types';
-import { base, colors, layout, radius, shadow, space, typography } from '../lib/theme';
+import { base, colors, layout, radius, shadow, space, touch, typography } from '../lib/theme';
+import { AnimatedToast } from '../components/AnimatedToast';
 import type { RootStackParamList } from '../App';
 
 function nowHHMM() {
@@ -137,11 +138,7 @@ export default function PunchScreen() {
         </Pressable>
       </View>
 
-      {toast ? (
-        <View style={[layout.toastOk, toast.error && layout.toastErr]}>
-          <Text style={layout.toastText}>{toast.text}</Text>
-        </View>
-      ) : null}
+      {toast ? <AnimatedToast text={toast.text} error={toast.error} /> : null}
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -303,6 +300,8 @@ const styles = StyleSheet.create({
   h1: { ...typography.title },
   headerSub: { ...typography.caption, marginTop: 2, color: colors.textSecondary },
   outBtn: {
+    minHeight: touch.min,
+    justifyContent: 'center',
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
     borderRadius: radius.md,
@@ -323,7 +322,13 @@ const styles = StyleSheet.create({
   },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', gap: space.md },
   heroLabel: { ...typography.section, marginBottom: 4 },
-  heroDate: { fontSize: 26, fontWeight: '700', color: colors.text, letterSpacing: -0.5 },
+  heroDate: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: colors.text,
+    letterSpacing: -0.5,
+    fontVariant: ['tabular-nums'],
+  },
   heroSub: { ...typography.caption, marginTop: space.md, lineHeight: 19 },
   statusPill: {
     alignSelf: 'flex-start',
@@ -357,15 +362,25 @@ const styles = StyleSheet.create({
   },
   punchRowLast: { borderBottomWidth: 0 },
   punchLabel: { flex: 1, fontSize: 13, color: colors.textSecondary, fontWeight: '500', lineHeight: 18 },
-  punchVal: { fontSize: 17, fontWeight: '700', color: colors.text, minWidth: 72, textAlign: 'right' },
+  // Cifre di larghezza fissa: gli orari restano allineati come sul cartellino.
+  punchVal: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
+    minWidth: 72,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+  },
   primary: {
+    minHeight: touch.min,
     backgroundColor: colors.primary,
     borderRadius: radius.lg,
     paddingVertical: space.lg,
     alignItems: 'center',
     ...shadow.sm,
   },
-  primaryPressed: { backgroundColor: colors.primaryPressed },
+  // Stato premuto: colore più scuro + lieve riduzione (risposta immediata, senza animazione).
+  primaryPressed: { backgroundColor: colors.primaryPressed, transform: [{ scale: 0.98 }] },
   primaryDisabled: { backgroundColor: colors.textMuted, opacity: 0.5 },
   primaryText: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' },
   hint: {
@@ -385,6 +400,8 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   outlineBtn: {
+    minHeight: touch.min,
+    justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
@@ -397,6 +414,8 @@ const styles = StyleSheet.create({
   outlineBtnPressed: { backgroundColor: colors.surface2 },
   outlineBtnText: { fontSize: 15, fontWeight: '600', color: colors.primary, textAlign: 'center' },
   adminBtn: {
+    minHeight: touch.min,
+    justifyContent: 'center',
     backgroundColor: colors.primary,
     borderRadius: radius.lg,
     paddingVertical: space.md,
@@ -427,6 +446,8 @@ const styles = StyleSheet.create({
   },
   pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.md },
   chip: {
+    minHeight: touch.min,
+    justifyContent: 'center',
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
     borderRadius: radius.md,
@@ -440,6 +461,8 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: 'row', gap: space.md, marginTop: space.md },
   cancelBtn: {
     flex: 1,
+    minHeight: touch.min,
+    justifyContent: 'center',
     paddingVertical: space.md,
     alignItems: 'center',
     borderRadius: radius.md,
@@ -448,6 +471,8 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: colors.onPrimary, fontWeight: '600' },
   saveBtn: {
     flex: 1,
+    minHeight: touch.min,
+    justifyContent: 'center',
     paddingVertical: space.md,
     alignItems: 'center',
     borderRadius: radius.md,
