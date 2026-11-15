@@ -545,6 +545,7 @@
             analyzePunchNonConformity,
             minutesToHHMM,
             calculateWorkMinutes,
+            analyzeDay,
             inclusiveCalendarDays,
             overlapDaysInMonthRange,
             isInsideGeofence,
@@ -2151,12 +2152,20 @@
 
             const fmt = (t) => (t && String(t).trim() !== "" ? normalizeTimeForInput(t) : "-");
 
+            // Giornate aperte (solo ingresso): solo segnalazione, nessun totale cambia.
+            const openDayLabels = [];
+            const todayStr = getTodayDateString();
+
             allDates.forEach(dateStr => {
                 const punch = punchByDate[dateStr];
                 const req = requestsByDate[dateStr];
                 const dateLabel = new Date(dateStr).toLocaleDateString('it-IT');
 
                 if (punch) {
+                    const dayInfo = analyzeDay(punch);
+                    if (dayInfo.aperta) {
+                        openDayLabels.push(dateStr === todayStr ? `${dateLabel} (oggi, in corso)` : dateLabel);
+                    }
                     const workMinutes = calculateWorkMinutes(punch);
                     let extraMinutes = 0;
                     // Condizioni per considerare un giorno come 'completo' e idoneo al calcolo straordinario:
@@ -2188,14 +2197,22 @@
                         ? ` <span style="font-size:0.72rem;font-weight:600;color:${REQUEST_TYPE_COLORS[req.request_type] || '#6b7280'};">(${REQUEST_TYPE_LABELS[req.request_type] || req.request_type})</span>`
                         : '';
 
+                    const warnStyle = 'font-size:0.72rem;font-weight:600;color:#b45309;';
+                    const openBadge = dayInfo.aperta
+                        ? ` <span style="${warnStyle}">(giornata aperta: manca l'uscita)</span>`
+                        : '';
+                    const noBreakLabel = dayInfo.pausaNonRegistrata
+                        ? `<br><span style="${warnStyle}">pausa non registrata</span>`
+                        : '';
+
                     tableHtml += `
                         <tr>
-                            <td style="font-weight: 500;">${dateLabel}${badge}</td>
+                            <td style="font-weight: 500;">${dateLabel}${badge}${openBadge}</td>
                             <td>${fmt(punch.iniziomattina)}</td>
                             <td>${fmt(punch.finemattina)}</td>
                             <td>${fmt(punch.iniziopomeriggio)}</td>
                             <td>${fmt(punch.finepomeriggio)}</td>
-                            <td>${punch.pausa_minuti || '0'}</td>
+                            <td>${punch.pausa_minuti || '0'}${noBreakLabel}</td>
                             <td style="font-weight: 500;">${workedHHMM}</td>
                             <td style="background-color: #fef3c7; ${extraStyle}">${extraHHMM}</td>
                         </tr>
@@ -2219,7 +2236,10 @@
             });
 
             tableHtml += '</tbody></table>';
-            punchesTableContainer.innerHTML = tableHtml;
+            const openDaysHtml = openDayLabels.length
+                ? `<p class="state-msg" style="color:#b45309;"><strong>Giornate aperte (solo ingresso, manca l'uscita):</strong> ${openDayLabels.join(', ')}</p>`
+                : '';
+            punchesTableContainer.innerHTML = openDaysHtml + tableHtml;
 
             // Timbrature + ore trasferta (viaggio / totali dichiarati, prorata al mese)
             updateMonthlySummary(list, totalWorkMinutes, completedDays, totalPositiveExtraMinutes, trasfertaExtraMinutes);
