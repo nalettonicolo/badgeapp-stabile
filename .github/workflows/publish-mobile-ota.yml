@@ -15,11 +15,7 @@
 name: Publish mobile OTA
 
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - 'badgeapp-mobile/**'
-      - '.github/workflows/publish-mobile-ota.yml'
+  # Deploy solo a comando: si avvia a mano (Actions → Run workflow) o dal pulsante «Pubblica» dell'Ufficio.
   workflow_dispatch:
 
 jobs:
