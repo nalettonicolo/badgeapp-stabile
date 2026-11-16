@@ -1,5 +1,8 @@
 # Pubblicazione sito statico (timbrature web)
 [build]
+  # Deploy solo a comando: le build partono solo dal build hook (pulsante «Pubblica» dell'Ufficio).
+  # Netlify non annulla mai le build avviate da un build hook, qualunque sia questo comando.
+  ignore = "exit 0"
   publish = "."
   command = "echo Static site — nessuna build richiesta"
 
