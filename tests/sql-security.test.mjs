@@ -98,14 +98,18 @@ test('esistono i trigger di audit su profiles, daily_punches ed employee_request
 // Trigger di protezione (todo finché non esistono)
 // -----------------------------------------------------------------------------
 
-test('esiste un trigger BEFORE UPDATE su profiles che protegge is_admin', { todo: MOTIVO_TRIGGER_PROFILES }, () => {
+// "todo" solo finché il trigger manca: appena esiste (schema o migrazione) il test diventa un controllo vero.
+const todoProfiles = beforeUpdateTriggers('profiles').length === 0 ? MOTIVO_TRIGGER_PROFILES : false;
+const todoRequests = beforeUpdateTriggers('employee_requests').length === 0 ? MOTIVO_TRIGGER_REQUESTS : false;
+
+test('esiste un trigger BEFORE UPDATE su profiles che protegge is_admin', { todo: todoProfiles }, () => {
   const triggers = beforeUpdateTriggers('profiles');
   assert.ok(triggers.length > 0, 'nessun trigger BEFORE UPDATE su public.profiles');
   const protects = triggers.some((t) => /is_admin/i.test(triggerFunctionBody(t)) || /OF\s+[^;]*is_admin/i.test(t));
   assert.ok(protects, 'nessun trigger BEFORE UPDATE su profiles fa riferimento a is_admin');
 });
 
-test('esiste un trigger BEFORE UPDATE su employee_requests che protegge status', { todo: MOTIVO_TRIGGER_REQUESTS }, () => {
+test('esiste un trigger BEFORE UPDATE su employee_requests che protegge status', { todo: todoRequests }, () => {
   const triggers = beforeUpdateTriggers('employee_requests');
   assert.ok(triggers.length > 0, 'nessun trigger BEFORE UPDATE su public.employee_requests');
   const protects = triggers.some((t) => /\bstatus\b/i.test(triggerFunctionBody(t)) || /OF\s+[^;]*\bstatus\b/i.test(t));
@@ -114,22 +118,35 @@ test('esiste un trigger BEFORE UPDATE su employee_requests che protegge status',
 
 test(
   'la funzione del trigger su is_admin lascia passare gli admin e blocca gli altri',
-  { todo: MOTIVO_TRIGGER_PROFILES },
+  { todo: todoProfiles },
   () => {
     const trig = beforeUpdateTriggers('profiles')[0];
     assert.ok(trig, 'nessun trigger BEFORE UPDATE su public.profiles');
     const body = triggerFunctionBody(trig);
-    assert.match(body, /is_admin\(\s*auth\.uid\(\)\s*\)/i, 'deve consentire la modifica a chi è già admin (public.is_admin(auth.uid()))');
+    assert.ok(chiamaIsAdminSuUtenteCorrente(body), 'deve consentire la modifica a chi è già admin: public.is_admin(auth.uid()) oppure public.is_admin(v_actor) con v_actor := auth.uid()');
     assert.match(body, /RAISE\s+EXCEPTION|NEW\.is_admin\s*:=\s*OLD\.is_admin/i, 'deve bloccare (RAISE EXCEPTION) o ripristinare OLD.is_admin');
   }
 );
+
+/** Vero se `body` chiama is_admin(auth.uid()) oppure is_admin(<variabile>) con <variabile> := auth.uid(). */
+function chiamaIsAdminSuUtenteCorrente(body) {
+  if (/is_admin\(\s*auth\.uid\(\)\s*\)/i.test(body)) return true;
+  for (const m of body.matchAll(/is_admin\(\s*(\w+)\s*\)/gi)) {
+    const v = m[1];
+    if (new RegExp(`\\b${v}\\s+uuid\\s*(?::=|=|DEFAULT)\\s*auth\\.uid\\(\\)`, 'i').test(body)) return true;
+    if (new RegExp(`\\b${v}\\s*:=\\s*auth\\.uid\\(\\)`, 'i').test(body)) return true;
+  }
+  return false;
+}
 
 test(
   'nessuna policy *_update_own senza una protezione BEFORE UPDATE sulla stessa tabella',
   {
     todo:
-      'oggi profiles_update_own ed employee_requests_update_own non hanno trigger BEFORE UPDATE di protezione ' +
-      '(vedi gli altri due test todo di questo file). Si toglie il todo quando entrambi i trigger esistono.',
+      todoProfiles || todoRequests
+        ? 'oggi profiles_update_own ed employee_requests_update_own non hanno trigger BEFORE UPDATE di protezione ' +
+          '(vedi gli altri due test todo di questo file). Il todo cade da solo quando entrambi i trigger esistono.'
+        : false,
   },
   () => {
     // Nome policy → tabella, da tutte le CREATE POLICY *_update_own (esclude *_or_admin: quelle ammettono già l'admin).
@@ -146,6 +163,92 @@ test(
   }
 );
 
-test.todo(
-  'migrazione SQL dedicata (supabase/migrations/…) con i trigger is_admin/status: non presente nel repo, oggi esiste solo SUPABASE_SCHEMA.sql'
+// -----------------------------------------------------------------------------
+// Sezione 15 di SUPABASE_SCHEMA.sql = migrazione 20261115_blocca_privilegi.sql
+// -----------------------------------------------------------------------------
+
+const schemaText = readFileSync(join(root, 'SUPABASE_SCHEMA.sql'), 'utf8');
+const sezione15 = (schemaText.match(/^--\s*15\)[\s\S]*$/m) ?? [''])[0];
+const migrazioneFile = sources.find((s) => /blocca_privilegi.*\.sql$/i.test(s.file));
+
+/** Toglie i commenti "--" e riduce gli spazi, per confrontare il codice e non la formattazione. */
+const normalizza = (t) => t.replace(/--[^\n]*/g, '').replace(/\s+/g, ' ').trim();
+
+/** Mappa nome → testo normalizzato di ogni CREATE FUNCTION e CREATE TRIGGER di `text`. */
+function funzioniETrigger(text) {
+  const pulito = text.replace(/--[^\n]*/g, '');
+  const funzioni = new Map();
+  for (const m of pulito.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?(\w+)\s*\([\s\S]*?\$\$[\s\S]*?\$\$\s*;/gi)) {
+    funzioni.set(m[1], normalizza(m[0]));
+  }
+  const trigger = new Map();
+  for (const m of pulito.matchAll(/CREATE\s+TRIGGER\s+(\w+)[\s\S]*?;/gi)) trigger.set(m[1], normalizza(m[0]));
+  return { funzioni, trigger };
+}
+
+const MOTIVO_ALLINEAMENTO =
+  'la sezione 15 di SUPABASE_SCHEMA.sql o supabase/migrations/20261115_blocca_privilegi.sql non esiste su questo ramo ' +
+  '(stanno su sicurezza/blocca-privilegi): il test si attiva da solo quando i due file ci sono.';
+
+test(
+  'sezione 15 di SUPABASE_SCHEMA.sql e migrazione 20261115 hanno le stesse funzioni e gli stessi trigger',
+  { todo: sezione15 && migrazioneFile ? false : MOTIVO_ALLINEAMENTO },
+  () => {
+    assert.ok(sezione15, 'sezione "-- 15)" non trovata in SUPABASE_SCHEMA.sql');
+    assert.ok(migrazioneFile, 'migrazione *blocca_privilegi*.sql non trovata in supabase/migrations/');
+    const a = funzioniETrigger(sezione15);
+    const b = funzioniETrigger(migrazioneFile.text);
+    assert.ok(a.funzioni.size > 0 && a.trigger.size > 0, 'la sezione 15 non contiene funzioni o trigger: il test non verificherebbe nulla');
+
+    assert.deepEqual([...a.funzioni.keys()].sort(), [...b.funzioni.keys()].sort(), 'funzioni diverse tra sezione 15 e migrazione');
+    assert.deepEqual([...a.trigger.keys()].sort(), [...b.trigger.keys()].sort(), 'trigger diversi tra sezione 15 e migrazione');
+    for (const [nome, testo] of a.funzioni) assert.equal(testo, b.funzioni.get(nome), `corpo della funzione ${nome} diverso tra sezione 15 e migrazione`);
+    for (const [nome, testo] of a.trigger) assert.equal(testo, b.trigger.get(nome), `definizione del trigger ${nome} diversa tra sezione 15 e migrazione`);
+  }
+);
+
+// -----------------------------------------------------------------------------
+// Nuove regole richieste dall'azione di devdb (todo motivati finché il codice non c'è)
+// -----------------------------------------------------------------------------
+
+/** Testo delle funzioni dei trigger BEFORE (INSERT e/o UPDATE) su `table` che coprono `evento`. */
+function corpiTriggerBefore(table, evento) {
+  const re = new RegExp(`CREATE\\s+(?:OR\\s+REPLACE\\s+)?TRIGGER\\s+\\w+\\s+BEFORE\\s+[^;]*?\\b${evento}\\b[^;]*?ON\\s+public\\.${table}\\b[^;]*;`, 'gi');
+  return (sql.match(re) ?? []).map(triggerFunctionBody);
+}
+
+const bodiesRichiesteUpdate = corpiTriggerBefore('employee_requests', 'UPDATE');
+const regolaApprovata = bodiesRichiesteUpdate.some((b) => /OLD\.status\s*(?:=|IN)\s*\(?\s*'approved'/i.test(b) && /is_admin\(/i.test(b));
+const bodiesProfiliInsert = corpiTriggerBefore('profiles', 'INSERT');
+const regolaIsAdminInsert = bodiesProfiliInsert.some((b) => /NEW\.is_admin/i.test(b) && /is_admin\(/i.test(b) && /RAISE\s+EXCEPTION|NEW\.is_admin\s*:=\s*false/i.test(b));
+
+test(
+  'una richiesta già approvata non è modificabile da un non-admin (date, ore, tipo)',
+  {
+    todo: regolaApprovata
+      ? false
+      : 'employee_requests_update_own (SUPABASE_SCHEMA.sql, USING/WITH CHECK auth.uid() = user_id) lascia al dipendente modificare date e ore di una richiesta già approvata, ' +
+        'e blocca_stato_richieste controlla solo il passaggio A approved/rejected, non una richiesta che è GIÀ approved. Serve una regola nuova (azione devdb).',
+  },
+  () => {
+    assert.ok(bodiesRichiesteUpdate.length > 0, 'nessun trigger BEFORE UPDATE su public.employee_requests');
+    assert.ok(regolaApprovata, "nessun trigger BEFORE UPDATE su employee_requests blocca la modifica quando OLD.status = 'approved' per un non-admin (is_admin)");
+    // Il blocco deve valere per le colonne dati, non solo per status.
+    const b = bodiesRichiesteUpdate.find((x) => /OLD\.status\s*(?:=|IN)\s*\(?\s*'approved'/i.test(x)) ?? '';
+    assert.match(b, /RAISE\s+EXCEPTION/i, "il trigger deve sollevare un errore (RAISE EXCEPTION) su una richiesta approved modificata da un non-admin");
+  }
+);
+
+test(
+  'is_admin non può essere impostato a true in INSERT su profiles da un non-admin',
+  {
+    todo: regolaIsAdminInsert
+      ? false
+      : 'profiles_insert_own (SUPABASE_SCHEMA.sql, WITH CHECK auth.uid() = id) non controlla le colonne e il trigger blocca_cambio_is_admin è solo BEFORE UPDATE: ' +
+        'un INSERT con is_admin = true passa se la riga del profilo manca. Serve la stessa regola anche in INSERT (azione devdb).',
+  },
+  () => {
+    assert.ok(bodiesProfiliInsert.length > 0, 'nessun trigger BEFORE INSERT su public.profiles');
+    assert.ok(regolaIsAdminInsert, 'nessun trigger BEFORE INSERT su profiles controlla NEW.is_admin con is_admin(<attore>) e blocca o forza a false');
+  }
 );
