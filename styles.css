@@ -73,16 +73,14 @@
     --shadow-btn: 0 2px 6px rgba(15, 23, 42, 0.12);
 }
 
-/* Inter: nessun file era incorporato (la regola font-family sotto funzionava
- * solo con Inter installato sul dispositivo). Il file va messo in
- * fonts/Inter-Variable.woff2 (licenza OFL); finché manca, il browser usa il
- * carattere di sistema indicato nello stack, senza errori visibili. */
+/* Inter: nessun file è incorporato (non c'era nel progetto: 404). Si usa Inter
+ * solo se installato sul dispositivo, altrimenti il carattere di sistema dello stack. */
 @font-face {
     font-family: "Inter";
     font-style: normal;
     font-weight: 100 900;
     font-display: swap;
-    src: local("Inter"), local("Inter Variable"), url("fonts/Inter-Variable.woff2") format("woff2");
+    src: local("Inter"), local("Inter Variable");
 }
 
 * { box-sizing: border-box; }
