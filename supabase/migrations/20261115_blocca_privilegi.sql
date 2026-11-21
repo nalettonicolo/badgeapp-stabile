@@ -22,8 +22,9 @@
 --
 -- Regole:
 --   1) profiles: solo un admin può cambiare is_admin.
---   2) employee_requests: solo un admin può portare status a approved/rejected,
---      e un non admin non può più modificare una richiesta già approved/rejected.
+--   2) employee_requests: solo un admin può portare status a approved/rejected.
+--   2b) employee_requests: un non admin non può più modificare una richiesta
+--      già approved/rejected.
 --   3) audit_log: si registra anche quando un utente MODIFICA i propri orari
 --      già inseriti, di qualunque giorno (prima si loggavano solo le modifiche
 --      su dati altrui). Nessun blocco sulle date: nessuna regola sul giorno.
