@@ -3,6 +3,18 @@
   "ruoli": {
     "role-vision-ui": [
       {
+        "testo": "Prima di dichiarare un file modificato, controlla con `git diff --stat` che compaia davvero nel diff. Il riepilogo deve descrivere solo ciò che il diff mostra.",
+        "volte": 1,
+        "prima": "2026-11-23T16:55:16.563Z",
+        "ultima": "2026-11-23T16:55:16.563Z"
+      },
+      {
+        "testo": "Prima di rinominare un `id` esistente, cerca in tutto il progetto (HTML, script, test) se qualcuno lo usa. Se il `for`/`id` c'è già e funziona, lascialo com'è.",
+        "volte": 1,
+        "prima": "2026-11-23T16:55:16.563Z",
+        "ultima": "2026-11-23T16:55:16.563Z"
+      },
+      {
         "testo": "Verifica sempre che il git diff non sia vuoto prima di dichiarare il lavoro completato.",
         "volte": 1,
         "prima": "2026-11-23T13:49:55.741Z",
@@ -28,5 +40,5 @@
       }
     ]
   },
-  "aggiornato": "2026-11-23T13:49:55.741Z"
+  "aggiornato": "2026-11-23T16:55:16.563Z"
 }
