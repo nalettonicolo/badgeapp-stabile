@@ -73,8 +73,9 @@
     --shadow-btn: 0 2px 6px rgba(15, 23, 42, 0.12);
 }
 
-/* Inter: nessun file è incorporato (non c'era nel progetto: 404). Si usa Inter
- * solo se installato sul dispositivo, altrimenti il carattere di sistema dello stack. */
+/* Inter si usa solo se installato sul dispositivo; altrimenti il carattere di sistema dello stack.
+ * Nessun file incorporato, quindi nessun 404. Per incorporarlo aggiungere fonts/Inter-Variable.woff2
+ * (licenza OFL) e riaggiungere l'url(). */
 @font-face {
     font-family: "Inter";
     font-style: normal;
@@ -489,6 +490,8 @@ button:focus-visible {
         /* --brand resta #1d4ed8 (riempimento di bottoni col testo bianco);
          * solo il blu usato come testo si schiarisce. */
         --brand-ink: #93c5fd;
+        /* Il colore di warning si schiarisce per mantenere il contrasto 4,5:1 su sfondo scuro. */
+        --warn: #fcd34d;
         --brand-tint: rgba(59, 130, 246, 0.12);
         --brand-tint-line: #1e3a8a;
         --ink: #e2e8f0;
