@@ -8,16 +8,20 @@ export const colors = {
   border: '#e2e8f0',
   borderStrong: '#cbd5e1',
   text: '#0f172a',
-  textSecondary: '#64748b',
-  textMuted: '#94a3b8',
+  // Contrasto ≥ 4,5:1 su bianco, su surface2 e su bg (WCAG 1.4.3):
+  // prima #64748b (4,3:1 su bg) e #94a3b8 (2,3:1 su bg).
+  textSecondary: '#475569',
+  textMuted: '#5b6b81',
   // Allineato al brand della webapp (styles.css: --brand / --brand-dark).
   primary: '#1d4ed8',
   primaryPressed: '#1e3a8a',
   primaryMuted: '#eff6ff',
   onPrimary: '#ffffff',
-  success: '#059669',
+  // Verde e rosso scurite: testo bianco sopra (toast, "Salva") ≥ 4,5:1; il rosso
+  // resta leggibile anche come testo su dangerMuted.
+  success: '#047857',
   successMuted: '#ecfdf5',
-  danger: '#dc2626',
+  danger: '#b91c1c',
   dangerMuted: '#fef2f2',
   warning: '#b45309',
   warningBg: '#fffbeb',
@@ -27,6 +31,9 @@ export const colors = {
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24 } as const;
 export const radius = { sm: 10, md: 14, lg: 18, xl: 22, pill: 999 } as const;
+
+/** Altezza minima di bottoni e zone da toccare (WCAG 2.5.8 / linee guida iOS e Android). */
+export const touch = { min: 44 } as const;
 
 export const shadow = {
   /** Ombra morbida tipo card Material / iOS */
@@ -70,6 +77,7 @@ export const base = {
     borderRadius: radius.md,
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
+    minHeight: touch.min,
     fontSize: 16,
     color: colors.text,
     borderWidth: StyleSheet.hairlineWidth,
@@ -119,6 +127,8 @@ export const layout = StyleSheet.create({
   },
   btnPrimaryText: { color: colors.onPrimary, fontSize: 16, fontWeight: '700' as const },
   btnOutline: {
+    minHeight: touch.min,
+    justifyContent: 'center',
     borderRadius: radius.lg,
     paddingVertical: space.md,
     paddingHorizontal: space.lg,

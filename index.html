@@ -24,7 +24,7 @@
 
     <div id="loading-view" style="text-align: center; max-width: 22rem; padding: 24px 16px;">
         <p style="font-size: 1.125rem; margin: 0 0 8px;">Caricamento in corso…</p>
-        <p id="loading-slow-hint" class="hidden" style="font-size: 0.875rem; color: #6b7280; margin: 0 0 12px;">
+        <p id="loading-slow-hint" class="hidden" style="font-size: 0.875rem; color: var(--muted); margin: 0 0 12px;">
             Sta impiegando più del previsto. Controlla la connessione.
         </p>
         <button type="button" id="loading-retry-btn" class="hidden btn-timbrature" style="max-width: 200px; margin: 0 auto;">
@@ -38,9 +38,9 @@
             <input type="email" 
                 id="email" placeholder="Email" required />
             <input type="password" id="password" placeholder="Password" required />
-            <button type="submit" style="background-color: #2563eb; color: white; padding: 12px;">Accedi</button>
+            <button type="submit" class="btn-brand" style="padding: 12px;">Accedi</button>
         </form>
-        <p style="font-size: 0.85rem; color: #6b7280; margin-top: 12px; text-align: center; max-width: 28rem; margin-left: auto; margin-right: auto;">
+        <p style="font-size: 0.85rem; color: var(--muted); margin-top: 12px; text-align: center; max-width: 28rem; margin-left: auto; margin-right: auto;">
             Ogni email ha la propria password (quella impostata alla creazione del dipendente o dopo un reset). La password dell’amministratore non vale per gli altri account.
         </p>
     </div>
@@ -48,7 +48,7 @@
     <div id="recovery-password-modal" class="modal hidden">
         <div class="modal-content">
             <h3 class="section-title" style="text-align: center;">Imposta nuova password</h3>
-            <p style="font-size: 0.9rem; color: #6b7280; margin-bottom: 16px;">
+            <p style="font-size: 0.9rem; color: var(--muted); margin-bottom: 16px;">
                 Hai aperto il link dall’email di reset. Scegli una nuova password per il tuo account.
             </p>
             <form id="recovery-password-form" style="display: flex; flex-direction: column; gap: 12px;">
@@ -57,7 +57,7 @@
                 <label for="recovery-password-confirm" style="font-weight: 600;">Ripeti password</label>
                 <input type="password" id="recovery-password-confirm" required minlength="10" autocomplete="new-password" />
                 <div style="display: flex; gap: 10px; margin-top: 8px;">
-                    <button type="submit" style="flex: 1; background-color: #2563eb; color: white; padding: 10px;">Salva e continua</button>
+                    <button type="submit" class="btn-brand" style="flex: 1; padding: 10px;">Salva e continua</button>
                     <button type="button" id="recovery-cancel-btn" style="flex: 1; background-color: #6b7280; color: white; padding: 10px;">Annulla</button>
                 </div>
             </form>
@@ -72,8 +72,8 @@
                     Email: <span id="user-email"></span></p>
             </div>
             <div class="view-controls">
-                <button id="history-btn" style="background-color: #f59e0b; color: white;">Storico Personale</button>
-                <button id="logout-btn" style="background-color: #ef4444; color: white;">Logout</button>
+                <button id="history-btn" class="btn-warn">Storico Personale</button>
+                <button id="logout-btn" class="btn-danger">Logout</button>
             </div>
         </div>
 
@@ -98,25 +98,25 @@
             <span style="width: 100%; text-align: center; font-size: 0.8rem; font-weight: 600; color: #374151;"
                 >Malattia · Trasferta · Ferie · ROL</span
             >
-            <button type="button" id="req-malattia-head" style="background-color: #e11d48; color: white; padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 90px; max-width: 200px;">
+            <button type="button" id="req-malattia-head" class="btn-malattia" style="padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 90px; max-width: 200px;">
                 Malattia
             </button>
-            <button type="button" id="req-trasferta-head" style="background-color: #ea580c; color: white; padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 90px; max-width: 200px;">
+            <button type="button" id="req-trasferta-head" class="btn-trasferta" style="padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 90px; max-width: 200px;">
                 Trasferta
             </button>
-            <button type="button" id="req-ferie-head" style="background-color: #0d9488; color: white; padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 90px; max-width: 200px;">
+            <button type="button" id="req-ferie-head" class="btn-ferie" style="padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 90px; max-width: 200px;">
                 Ferie
             </button>
-            <button type="button" id="req-rol-head" style="background-color: #7c3aed; color: white; padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 90px; max-width: 200px;">
+            <button type="button" id="req-rol-head" class="btn-rol" style="padding: 8px 14px; border-radius: 8px; flex: 1; min-width: 90px; max-width: 200px;">
                 ROL
             </button>
         </div>
 
         <div style="border: 
-            1px solid #bfdbfe; background-color: #eff6ff; border-radius: 12px; padding: 24px;">
+            1px solid var(--brand-tint-line); background-color: var(--brand-tint); border-radius: 12px; padding: 24px;">
             <h3 class="section-title" style="margin-bottom: 1rem;">Timbrature odierne</h3>
 
-            <p style="font-size: 0.85rem; color: #6b7280; margin: -0.5rem 0 0.75rem 0">
+            <p style="font-size: 0.85rem; color: var(--muted); margin: -0.5rem 0 0.75rem 0">
                 Richieste malattia / trasferta / ferie: usa i pulsanti sopra o quelli qui sotto (stessa funzione).
             </p>
             <div id="employee-requests-list" style="margin-bottom: 1rem; font-size: 0.82rem; color: #374151; line-height: 1.45;"></div>
@@ -133,82 +133,79 @@
                     <div class="break-row">
                   
                         <label>Pausa pranzo totale (minuti):</label>
-                        <input id="pausaPranzoInput" type="text" readonly style="background-color: #dbeafe;
-                            font-weight: 700;" />
+                        <input id="pausaPranzoInput" type="text" readonly style="font-weight: 700;" />
                     </div>
                 </div>
             </div>
             
             <div class="punch-buttons">
-                <button id="timbraBtn" style="background-color: #2563eb;
-                    color: white;">Timbra ingresso</button>
-                <button id="manual-punch-btn" style="background-color: #059669;
-                    color: white;">Timbra Manualmente (Solo per Correzioni)</button>
+                <button id="timbraBtn" class="btn-brand">Timbra ingresso</button>
+                <button id="manual-punch-btn" class="btn-ok">Timbra Manualmente (Solo per Correzioni)</button>
             </div>
-            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
+            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--brand-tint-line);">
                 <p style="font-weight: 700; margin: 0 0 0.25rem 0; color: #374151; font-size: 0.95rem;">Malattia, trasferta, ferie e ROL</p>
-                <p style="font-size: 0.8rem; color: #6b7280; margin: 0 0 0.5rem 0;">Stesso salvataggio dell’app mobile (tabella <code style="font-size: 0.75rem">employee_requests</code>, stato salvato).</p>
+                <p style="font-size: 0.8rem; color: var(--muted); margin: 0 0 0.5rem 0;">Stesso salvataggio dell’app mobile (tabella <code style="font-size: 0.75rem">employee_requests</code>, stato salvato).</p>
                 <div class="absence-buttons">
-                    <button type="button" id="req-malattia-btn" style="background-color: #e11d48; color: white;">Malattia</button>
-                    <button type="button" id="req-trasferta-btn" style="background-color: #ea580c; color: white;">Trasferta</button>
-                    <button type="button" id="req-ferie-btn" style="background-color: #0d9488; color: white;">Ferie</button>
-                    <button type="button" id="req-rol-btn" style="background-color: #7c3aed; color: white;">ROL</button>
+                    <button type="button" id="req-malattia-btn" class="btn-malattia">Malattia</button>
+                    <button type="button" id="req-trasferta-btn" class="btn-trasferta">Trasferta</button>
+                    <button type="button" id="req-ferie-btn" class="btn-ferie">Ferie</button>
+                    <button type="button" id="req-rol-btn" class="btn-rol">ROL</button>
                 </div>
             </div>
-            <div id="leave-prospectus-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
-                <p style="font-weight: 700; margin: 0 0 0.5rem 0; color: #374151; font-size: 0.95rem;">Prospetto ferie, ROL e permessi <span id="leave-prospectus-year" style="font-weight: 400; color: #6b7280;"></span></p>
+            <div id="leave-prospectus-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--brand-tint-line);">
+                <p style="font-weight: 700; margin: 0 0 0.5rem 0; color: #374151; font-size: 0.95rem;">Prospetto ferie, ROL e permessi <span id="leave-prospectus-year" style="font-weight: 400; color: var(--muted);"></span></p>
                 <div id="leave-prospectus-body" style="font-size: 0.82rem; color: #374151; line-height: 1.5;">
                     <p class="state-msg">Caricamento...</p>
                 </div>
-                <button type="button" id="leave-history-view-btn" style="margin-top: 0.5rem; background: none; border: none; color: #2563eb; font-weight: 600; font-size: 0.82rem; padding: 0; cursor: pointer; text-decoration: underline;">Vedi storico completo &rarr;</button>
+                <button type="button" id="leave-history-view-btn" class="btn-link" style="margin-top: 0.5rem; background: none; border: none; color: var(--brand-ink); font-weight: 600; font-size: 0.82rem; padding: 0; cursor: pointer; text-decoration: underline;">Vedi storico completo &rarr;</button>
             </div>
-            <div id="payslip-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
+            <div id="payslip-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--brand-tint-line);">
                 <p style="font-weight: 700; margin: 0 0 0.25rem 0; color: #374151; font-size: 0.95rem;">Busta paga: carica e confronta ore</p>
-                <p style="font-size: 0.78rem; color: #6b7280; margin: 0 0 0.5rem 0; line-height: 1.4;">
+                <p style="font-size: 0.78rem; color: var(--muted); margin: 0 0 0.5rem 0; line-height: 1.4;">
                     Carica il PDF o la foto della busta paga del mese, inserisci le ore di ferie/ROL/permesso dichiarate e confrontale con quelle calcolate dall'app dalle tue richieste già approvate.
                 </p>
                 <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center;">
                     <select id="payslip-month-select" style="min-width: 160px;"></select>
                     <input type="file" id="payslip-file-input" accept="application/pdf,image/*" style="flex: 1; min-width: 180px;" />
-                    <button type="button" id="payslip-upload-btn" style="background-color: #2563eb; color: white; white-space: nowrap;">Carica file</button>
+                    <button type="button" id="payslip-upload-btn" class="btn-brand" style="white-space: nowrap;">Carica file</button>
                 </div>
-                <p id="payslip-file-status" style="font-size: 0.78rem; color: #6b7280; margin: 0 0 10px 0;"></p>
+                <p id="payslip-file-status" style="font-size: 0.78rem; color: var(--muted); margin: 0 0 10px 0;"></p>
                 <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center;">
                     <button type="button" id="payslip-ocr-btn" style="background-color: #7c3aed; color: white; white-space: nowrap;">Leggi automaticamente (OCR)</button>
-                    <span id="payslip-ocr-status" style="font-size: 0.78rem; color: #6b7280;"></span>
+                    <span id="payslip-ocr-status" style="font-size: 0.78rem; color: var(--muted);"></span>
                 </div>
                 <div id="payslip-declared-rows" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;">
                     <div class="payslip-declared-row" data-leave-type="ferie" style="display: grid; grid-template-columns: 110px 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
                         <strong>Ferie</strong>
-                        <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Ore dichiarate in busta</label><input type="number" step="0.5" class="payslip-declared-hours" style="width: 100%;" /></div>
+                        <div><label for="payslip-declared-ferie" style="font-size: 0.75rem; color: var(--muted); display: block;">Ore dichiarate in busta</label><input type="number" step="0.5" id="payslip-declared-ferie" class="payslip-declared-hours" style="width: 100%;" /></div>
                         <div class="payslip-computed" style="color: #374151;"></div>
                     </div>
                     <div class="payslip-declared-row" data-leave-type="rol" style="display: grid; grid-template-columns: 110px 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
                         <strong>ROL</strong>
-                        <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Ore dichiarate in busta</label><input type="number" step="0.5" class="payslip-declared-hours" style="width: 100%;" /></div>
+                        <div><label for="payslip-declared-rol" style="font-size: 0.75rem; color: var(--muted); display: block;">Ore dichiarate in busta</label><input type="number" step="0.5" id="payslip-declared-rol" class="payslip-declared-hours" style="width: 100%;" /></div>
                         <div class="payslip-computed" style="color: #374151;"></div>
                     </div>
                     <div class="payslip-declared-row" data-leave-type="permesso" style="display: grid; grid-template-columns: 110px 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
                         <strong>Permesso</strong>
-                        <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Ore dichiarate in busta</label><input type="number" step="0.5" class="payslip-declared-hours" style="width: 100%;" /></div>
+                        <div><label for="payslip-declared-permesso" style="font-size: 0.75rem; color: var(--muted); display: block;">Ore dichiarate in busta</label><input type="number" step="0.5" id="payslip-declared-permesso" class="payslip-declared-hours" style="width: 100%;" /></div>
                         <div class="payslip-computed" style="color: #374151;"></div>
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
-                    <button type="button" id="payslip-save-declared-btn" style="background-color: #22c55e; color: white;">Salva confronto</button>
-                    <span id="payslip-declared-status" style="font-size: 0.85rem; color: #6b7280;"></span>
+                    <button type="button" id="payslip-save-declared-btn" class="btn-ok">Salva confronto</button>
+                    <span id="payslip-declared-status" style="font-size: 0.85rem; color: var(--muted);"></span>
                 </div>
             </div>
-            <div id="geo-autopunch-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #bfdbfe;">
+            <div id="geo-autopunch-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--brand-tint-line);">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <input type="checkbox" id="geo-autopunch-toggle" style="width: auto;" />
                     <label for="geo-autopunch-toggle" style="font-weight: 600; font-size: 0.9rem; color: #374151;">Timbra automaticamente ingressi e uscite quando entro/esco dalla sede</label>
                 </div>
-                <p style="font-size: 0.78rem; color: #6b7280; margin: 0.35rem 0 0 26px; line-height: 1.4;">
+                <p style="font-size: 0.78rem; color: var(--muted); margin: 0.35rem 0 0 26px; line-height: 1.4;">
                     Richiede il permesso di localizzazione del browser e funziona solo con questa pagina aperta (non ad app chiusa).
                     Timbra il campo mancante coerente col movimento (ingresso mattutino o rientro pomeridiano quando entri, uscita pausa pranzo o fine giornata quando esci), solo se l'amministratore ha configurato un'area.
                 </p>
-                <p id="geo-autopunch-status" style="font-size: 0.78rem; color: #6b7280; margin: 0.35rem 0 0 26px;"></p>
+                <p id="geo-autopunch-status" style="font-size: 0.78rem; color: var(--muted); margin: 0.35rem 0 0 26px;"></p>
             </div>
             <p id="timbra-message" style="text-align: center;
                 margin-top: 0.5rem; font-size: 0.875rem; color: #4b5563; min-height: 1.25rem;"></p>
@@ -219,7 +216,7 @@
         <div class="view-header">
             <div style="display: flex; align-items: center; gap: 10px;"> 
                 <h2><span id="history-title-prefix">Storico Timbrature</span> <span id="history-user-display" style="font-weight: 700;"></span></h2>
-                <button id="add-punch-btn" aria-label="Inserisci timbratura mancante" style="background-color: #2563eb; color: white; padding: 6px 10px; border-radius: 6px; font-weight: 600; font-size: 1.1rem; line-height: 1;">
+                <button id="add-punch-btn" aria-label="Inserisci timbratura mancante" class="btn-brand" style="padding: 6px 10px; border-radius: 6px; font-weight: 600; font-size: 1.1rem; line-height: 1;">
                     +
                 </button>
             </div>
@@ -237,7 +234,7 @@
         </div>
         <div id="admin-history-controls" class="hidden">
             <p id="current-admin-name" style="font-weight: 600;
-                color: #3b82f6; margin: 0;"></p>
+                color: var(--brand-ink); margin: 0;"></p>
         </div>
 
         <div id="punches-table-container">
@@ -317,8 +314,7 @@
                             font-size: 0.9rem;">Assegna permessi di Admin</label>
                     </div>
 
-                    <button type="submit" style="background-color: #22c55e;
-                        color: white;">Registra Dipendente</button>
+                    <button type="submit" class="btn-ok">Registra Dipendente</button>
                 </form>
             </div>
 
@@ -326,11 +322,10 @@
                 <h3 class="section-title">Reset Password Dipendente</h3>
                 <form id="reset-password-form">
                     <p style="font-size: 0.875rem;
-                        color: #6b7280;">Invia email di reset reale. Inserisci UID o email del dipendente.</p>
+                        color: var(--muted);">Invia email di reset reale. Inserisci UID o email del dipendente.</p>
                     <input type="text" id="reset-user-id" placeholder="ID Utente o Email dipendente" required />
                     <input type="password" id="reset-new-password" placeholder="Nuova Password (min 10 car.)" required minlength="10" />
-                    <button type="submit" style="background-color: #f97316;
-                        color: white;">Invia Email Reset Password</button>
+                    <button type="submit" class="btn-trasferta">Invia Email Reset Password</button>
                 </form>
             </div>
         </div>
@@ -343,13 +338,13 @@
             </p>
             <div style="display: flex; gap: 8px; margin-bottom: 10px;">
                 <input type="text" id="geofence-address-search" placeholder="Cerca un indirizzo per centrare la mappa…" style="flex: 1;" />
-                <button type="button" id="geofence-address-search-btn" style="background-color: #6366f1; color: white; white-space: nowrap;">Cerca</button>
+                <button type="button" id="geofence-address-search-btn" class="btn-brand" style="white-space: nowrap;">Cerca</button>
             </div>
             <div id="geofence-map" style="height: 360px; border-radius: 8px; border: 1px solid #d1d5db;"></div>
             <div style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: center;">
                 <button type="button" id="geofence-save-btn" style="background-color: #7c3aed; color: white;">Salva area</button>
                 <button type="button" id="geofence-clear-btn" style="background-color: #6b7280; color: white;">Rimuovi area</button>
-                <span id="geofence-status" style="font-size: 0.85rem; color: #6b7280;"></span>
+                <span id="geofence-status" style="font-size: 0.85rem; color: var(--muted);"></span>
             </div>
         </div>
 
@@ -377,31 +372,31 @@
                     <label for="leave-balance-year-input" style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 4px;">Anno</label>
                     <input type="number" id="leave-balance-year-input" style="width: 100%;" />
                 </div>
-                <button type="button" id="leave-balance-load-btn" style="background-color: #6366f1; color: white; white-space: nowrap;">Carica</button>
+                <button type="button" id="leave-balance-load-btn" class="btn-brand" style="white-space: nowrap;">Carica</button>
             </div>
             <div id="leave-balance-rows" style="display: flex; flex-direction: column; gap: 10px;">
                 <div class="leave-balance-row" data-leave-type="ferie" style="display: grid; grid-template-columns: 110px 1fr 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
                     <strong>Ferie (gg)</strong>
-                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Maturate</label><input type="number" step="0.5" class="lb-entitlement" style="width: 100%;" /></div>
-                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Riporto</label><input type="number" step="0.5" class="lb-carryover" style="width: 100%;" /></div>
+                    <div><label for="lb-entitlement-ferie" style="font-size: 0.75rem; color: var(--muted); display: block;">Maturate</label><input type="number" step="0.5" id="lb-entitlement-ferie" class="lb-entitlement" style="width: 100%;" /></div>
+                    <div><label for="lb-carryover-ferie" style="font-size: 0.75rem; color: var(--muted); display: block;">Riporto</label><input type="number" step="0.5" id="lb-carryover-ferie" class="lb-carryover" style="width: 100%;" /></div>
                     <div class="lb-computed" style="color: #374151;"></div>
                 </div>
                 <div class="leave-balance-row" data-leave-type="rol" style="display: grid; grid-template-columns: 110px 1fr 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
                     <strong>ROL (ore)</strong>
-                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Maturate</label><input type="number" step="0.5" class="lb-entitlement" style="width: 100%;" /></div>
-                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Riporto</label><input type="number" step="0.5" class="lb-carryover" style="width: 100%;" /></div>
+                    <div><label for="lb-entitlement-rol" style="font-size: 0.75rem; color: var(--muted); display: block;">Maturate</label><input type="number" step="0.5" id="lb-entitlement-rol" class="lb-entitlement" style="width: 100%;" /></div>
+                    <div><label for="lb-carryover-rol" style="font-size: 0.75rem; color: var(--muted); display: block;">Riporto</label><input type="number" step="0.5" id="lb-carryover-rol" class="lb-carryover" style="width: 100%;" /></div>
                     <div class="lb-computed" style="color: #374151;"></div>
                 </div>
                 <div class="leave-balance-row" data-leave-type="permesso" style="display: grid; grid-template-columns: 110px 1fr 1fr 1fr; gap: 8px; align-items: center; font-size: 0.85rem;">
                     <strong>Permesso (ore)</strong>
-                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Maturate</label><input type="number" step="0.5" class="lb-entitlement" style="width: 100%;" /></div>
-                    <div><label style="font-size: 0.75rem; color: #6b7280; display: block;">Riporto</label><input type="number" step="0.5" class="lb-carryover" style="width: 100%;" /></div>
+                    <div><label for="lb-entitlement-permesso" style="font-size: 0.75rem; color: var(--muted); display: block;">Maturate</label><input type="number" step="0.5" id="lb-entitlement-permesso" class="lb-entitlement" style="width: 100%;" /></div>
+                    <div><label for="lb-carryover-permesso" style="font-size: 0.75rem; color: var(--muted); display: block;">Riporto</label><input type="number" step="0.5" id="lb-carryover-permesso" class="lb-carryover" style="width: 100%;" /></div>
                     <div class="lb-computed" style="color: #374151;"></div>
                 </div>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 12px; align-items: center;">
-                <button type="button" id="leave-balance-save-btn" style="background-color: #22c55e; color: white;">Salva monte ore</button>
-                <span id="leave-balance-status" style="font-size: 0.85rem; color: #6b7280;"></span>
+                <button type="button" id="leave-balance-save-btn" class="btn-ok">Salva monte ore</button>
+                <span id="leave-balance-status" style="font-size: 0.85rem; color: var(--muted);"></span>
             </div>
         </div>
 
@@ -421,7 +416,7 @@
             <h3 class="section-title" style="font-size: 1.35rem; text-align: center; margin-bottom: 20px;">Timbratura Manuale</h3>
             <form id="manual-punch-form" style="display: flex;
                 flex-direction: column; gap: 15px;">
-                <p style="color: #ef4444;
+                <p style="color: var(--danger-ink);
                     font-size: 0.9rem;">Attenzione: La timbratura manuale sovrascrive i dati esistenti per la data e il campo selezionati.</p>
                 
                 <label for="manual-type">Tipo di Timbratura:</label>
@@ -436,8 +431,7 @@
 
                 <div style="display: flex;
                     gap: 10px; margin-top: 10px;">
-                    <button type="submit" style="flex: 1;
-                        background-color: #059669; color: white;">Salva Timbratura</button>
+                    <button type="submit" class="btn-ok" style="flex: 1;">Salva Timbratura</button>
                     <button type="button" id="close-manual-modal" style="flex: 1;
                         background-color: #6b7280; color: white;">Annulla</button>
                 </div>
@@ -479,7 +473,7 @@
                 
 
                 <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <button type="submit" id="save-missing-punches-btn" style="flex: 1; background-color: #10b981; color: white;">Salva</button>
+                    <button type="submit" id="save-missing-punches-btn" class="btn-ok" style="flex: 1;">Salva</button>
                     <button type="button" id="close-insert-modal" style="flex: 1; background-color: #6b7280; color: white;">Annulla</button>
                 </div>
             </form>
@@ -523,7 +517,7 @@
                     <textarea id="req-note" rows="3" placeholder="Certificato, destinazione, ecc." style="width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; padding: 10px; resize: vertical;"></textarea>
                 </div>
                 <div style="display: flex; gap: 10px; margin-top: 6px;">
-                    <button type="submit" id="employee-request-submit" style="flex: 1; background-color: #2563eb; color: white;">Salva</button>
+                    <button type="submit" id="employee-request-submit" class="btn-brand" style="flex: 1;">Salva</button>
                     <button type="button" id="close-employee-request-modal" style="flex: 1; background-color: #6b7280; color: white;">Annulla</button>
                 </div>
             </form>
@@ -774,9 +768,9 @@
 
         function showMessage(message, isError = false) {
             const messageBox = document.createElement("div");
-            const bgColor = isError ? 'background-color: #dc2626;' : 'background-color: #10b981;';
-            messageBox.style.cssText = `position: fixed; top: 1rem; right: 1rem; padding: 1rem;
-                border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); color: white; font-weight: 500; z-index: 100; ${bgColor}`;
+            // Aspetto e animazione sono in styles.css (.toast): rispetta "riduci movimento".
+            messageBox.className = isError ? "toast toast--error" : "toast toast--ok";
+            messageBox.setAttribute("role", isError ? "alert" : "status");
             messageBox.textContent = message;
             document.body.appendChild(messageBox);
             setTimeout(() => {
@@ -1556,7 +1550,7 @@
                 const note = row.note
                     ? ` — ${String(row.note).slice(0, 100)}${String(row.note).length > 100 ? "…" : ""}`
                     : "";
-                return `<div style="margin-bottom:6px;border-bottom:1px solid #e5e7eb;padding-bottom:6px;"><strong>${tipo}</strong>${extra}: ${d0} – ${d1} · <span style="color:#6b7280;">${st}</span>${note}</div>`;
+                return `<div style="margin-bottom:6px;border-bottom:1px solid #e5e7eb;padding-bottom:6px;"><strong>${tipo}</strong>${extra}: ${d0} – ${d1} · <span style="color:var(--muted);">${st}</span>${note}</div>`;
             });
             employeeRequestsListEl.innerHTML =
                 '<div style="font-weight:600;margin-bottom:6px;">Ultime richieste</div>' + lines.join("");
@@ -1764,7 +1758,7 @@
         function setPayslipDeclaredRow(leaveType, declaredHours, computedText) {
             const row = document.querySelector(`.payslip-declared-row[data-leave-type="${leaveType}"]`);
             if (!row) return;
-            row.querySelector(".payslip-declared-hours").value = declaredHours != null ? declaredHours : "";
+            document.getElementById(`payslip-hours-${leaveType}`).value = declaredHours != null ? declaredHours : "";
             row.querySelector(".payslip-computed").textContent = computedText || "";
         }
 
@@ -1879,8 +1873,8 @@
         }
 
         function setPayslipDeclaredRowValue(leaveType, value) {
-            const row = document.querySelector(`.payslip-declared-row[data-leave-type="${leaveType}"]`);
-            if (row) row.querySelector(".payslip-declared-hours").value = value;
+            const input = document.getElementById(`payslip-hours-${leaveType}`);
+            if (input) input.value = value;
         }
 
         /** Salva le ore dichiarate (manuali o rivisto dopo OCR) e segna il documento come verificato da un umano. */
@@ -1893,8 +1887,7 @@
             const { year, month } = parseSelectedPayslipMonth();
             const payload = { user_id: currentUser.id, year, month, file_path: currentPayslipDocument.file_path, verified: true, uploaded_by: currentUser.id };
             for (const leaveType of LEAVE_TYPES) {
-                const row = document.querySelector(`.payslip-declared-row[data-leave-type="${leaveType}"]`);
-                const value = parseFloat(row.querySelector(".payslip-declared-hours").value);
+                const value = parseFloat(document.getElementById(`payslip-hours-${leaveType}`).value);
                 payload[`${leaveType}_ore_dichiarate`] = Number.isFinite(value) ? value : null;
             }
             if (payslipDeclaredStatusEl) payslipDeclaredStatusEl.textContent = "Salvataggio...";
@@ -2128,7 +2121,7 @@
                             <th>Fine Pomeriggio (Uscita)</th>
                             <th>Pausa (Min)</th>
                             <th>Lavoro Effettivo</th>
-                            <th style="background-color: #fef3c7;">Straordinario</th>
+                            <th class="extra-col">Straordinario</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2138,9 +2131,10 @@
             let completedDays = 0;
             let totalPositiveExtraMinutes = 0;
 
-            // Colori coerenti con i pulsanti malattia/trasferta/ferie del resto dell'app.
-            const REQUEST_TYPE_COLORS = { malattia: '#e11d48', trasferta: '#ea580c', ferie: '#0d9488', permesso: '#2563eb', rol: '#7c3aed' };
-            const REQUEST_ROW_BG = { saved: '#fef9c3', pending: '#fef9c3', approved: '#dcfce7' };
+            // Colori coerenti con i pulsanti malattia/trasferta/ferie del resto dell'app:
+            // definiti come variabili in styles.css (--req-*-ink, --req-row-*).
+            const REQUEST_TYPE_COLORS = { malattia: 'var(--req-malattia-ink)', trasferta: 'var(--req-trasferta-ink)', ferie: 'var(--req-ferie-ink)', permesso: 'var(--req-permesso-ink)', rol: 'var(--req-rol-ink)' };
+            const REQUEST_ROW_BG = { saved: 'var(--req-row-pending)', pending: 'var(--req-row-pending)', approved: 'var(--req-row-approved)' };
 
             const punchByDate = {};
             for (const p of list) punchByDate[p.punch_date] = p;
@@ -2179,13 +2173,12 @@
                     const extraHHMM = minutesToHHMM(extraMinutes);
 
                     // Stile per evidenziare lo straordinario
-                    const extraStyle = extraMinutes > 0 ? 'color: green; font-weight: bold;' : (extraMinutes < 0 ?
-                        'color: red;' : '');
+                    const extraClass = extraMinutes > 0 ? ' extra-pos' : (extraMinutes < 0 ? ' extra-neg' : '');
 
                     // Un giorno può avere sia timbrature sia una richiesta che lo copre
                     // (es. trasferta con orario parziale registrato): lo segnaliamo comunque.
                     const badge = req
-                        ? ` <span style="font-size:0.72rem;font-weight:600;color:${REQUEST_TYPE_COLORS[req.request_type] || '#6b7280'};">(${REQUEST_TYPE_LABELS[req.request_type] || req.request_type})</span>`
+                        ? ` <span style="font-size:0.72rem;font-weight:600;color:${REQUEST_TYPE_COLORS[req.request_type] || 'var(--muted)'};">(${REQUEST_TYPE_LABELS[req.request_type] || req.request_type})</span>`
                         : '';
 
                     tableHtml += `
@@ -2197,7 +2190,7 @@
                             <td>${fmt(punch.finepomeriggio)}</td>
                             <td>${punch.pausa_minuti || '0'}</td>
                             <td style="font-weight: 500;">${workedHHMM}</td>
-                            <td style="background-color: #fef3c7; ${extraStyle}">${extraHHMM}</td>
+                            <td class="extra-col${extraClass}">${extraHHMM}</td>
                         </tr>
                     `;
                 } else if (req) {
@@ -2205,13 +2198,13 @@
                     // (es. ferie): prima non compariva affatto nel calendario.
                     const typeLabel = REQUEST_TYPE_LABELS[req.request_type] || req.request_type;
                     const statusLabel = STATUS_LABELS[req.status] || req.status;
-                    const rowBg = REQUEST_ROW_BG[req.status] || '#f3f4f6';
+                    const rowBg = REQUEST_ROW_BG[req.status] || 'var(--req-row-none)';
                     tableHtml += `
                         <tr style="background-color: ${rowBg};">
                             <td style="font-weight: 500;">${dateLabel}</td>
                             <td colspan="7" style="text-align: center;">
-                                <strong style="color: ${REQUEST_TYPE_COLORS[req.request_type] || '#374151'};">${typeLabel}</strong>
-                                <span style="color: #6b7280; margin-left: 8px;">${statusLabel}</span>
+                                <strong style="color: ${REQUEST_TYPE_COLORS[req.request_type] || 'var(--ink)'};">${typeLabel}</strong>
+                                <span style="color: var(--muted); margin-left: 8px;">${statusLabel}</span>
                             </td>
                         </tr>
                     `;
@@ -2357,13 +2350,13 @@
             }
 
             profilesUl.innerHTML = data.map(profile => {
-                const isAdminBadge = profile.is_admin ? '<span style="background-color: #f97316; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 10px;">ADMIN</span>' : '';
+                const isAdminBadge = profile.is_admin ? '<span class="btn-trasferta" style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 10px;">ADMIN</span>' : '';
                 return `
                     <li>
                         <div class="clickable-uid" data-user-id="${profile.id}" data-user-name="${profile.first_name} ${profile.last_name}">
                             ${profile.first_name} ${profile.last_name} (${profile.email})
                         </div>
-                        <span style="font-size: 0.8rem; color: #9ca3af; margin-top: 5px; display: block;">UID: ${profile.id.substring(0, 8)}...</span>
+                        <span style="font-size: 0.8rem; color: var(--muted); margin-top: 5px; display: block;">UID: ${profile.id.substring(0, 8)}...</span>
                         ${isAdminBadge}
                     </li>
                 `;
@@ -2428,8 +2421,8 @@
         function setLeaveBalanceRow(leaveType, entitlement, carryover, usedText) {
             const row = document.querySelector(`.leave-balance-row[data-leave-type="${leaveType}"]`);
             if (!row) return;
-            row.querySelector('.lb-entitlement').value = entitlement != null ? entitlement : '';
-            row.querySelector('.lb-carryover').value = carryover != null ? carryover : '';
+            document.getElementById(`lb-entitlement-${leaveType}`).value = entitlement != null ? entitlement : '';
+            document.getElementById(`lb-carryover-${leaveType}`).value = carryover != null ? carryover : '';
             row.querySelector('.lb-computed').textContent = usedText || '';
         }
 
@@ -2479,9 +2472,8 @@
                 return;
             }
             const rows = LEAVE_TYPES.map(leaveType => {
-                const row = document.querySelector(`.leave-balance-row[data-leave-type="${leaveType}"]`);
-                const entitlement = parseFloat(row.querySelector('.lb-entitlement').value);
-                const carryover = parseFloat(row.querySelector('.lb-carryover').value);
+                const entitlement = parseFloat(document.getElementById(`lb-entitlement-${leaveType}`).value);
+                const carryover = parseFloat(document.getElementById(`lb-carryover-${leaveType}`).value);
                 return {
                     user_id: userId,
                     year,
@@ -2643,7 +2635,7 @@
                     extra = ` — ${req.total_hours_declared} ore`;
                 }
                 const note = req.note
-                    ? `<div style="font-size:0.8rem;color:#6b7280;margin-top:2px;">${String(req.note).slice(0, 150)}</div>`
+                    ? `<div style="font-size:0.8rem;color:var(--muted);margin-top:2px;">${String(req.note).slice(0, 150)}</div>`
                     : '';
                 return `
                     <li style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;">
@@ -2652,8 +2644,8 @@
                             ${note}
                         </div>
                         <div style="display:flex; gap:8px; flex-shrink:0;">
-                            <button type="button" class="approve-request-btn" data-request-id="${req.id}" style="background-color:#16a34a; color:white; padding:6px 12px; border-radius:6px; font-size:0.85rem;">Approva</button>
-                            <button type="button" class="reject-request-btn" data-request-id="${req.id}" style="background-color:#dc2626; color:white; padding:6px 12px; border-radius:6px; font-size:0.85rem;">Rifiuta</button>
+                            <button type="button" class="approve-request-btn btn-ok" data-request-id="${req.id}" style="padding:6px 12px; border-radius:6px; font-size:0.85rem;">Approva</button>
+                            <button type="button" class="reject-request-btn btn-danger" data-request-id="${req.id}" style="padding:6px 12px; border-radius:6px; font-size:0.85rem;">Rifiuta</button>
                         </div>
                     </li>
                 `;
@@ -2970,7 +2962,14 @@
             if (!currentUser || nextPunchIndex >= punchSteps.length) return;
             timbraBtn.disabled = true;
             timbraBtn.textContent = "Salvataggio...";
+            const indexBeforePunch = nextPunchIndex;
             await runSinglePunch();
+            if (nextPunchIndex > indexBeforePunch) {
+                // Conferma visiva: riavvia l'animazione anche su timbrature ravvicinate.
+                timbraBtn.classList.remove("punch-confirm");
+                void timbraBtn.offsetWidth;
+                timbraBtn.classList.add("punch-confirm");
+            }
             if (nextPunchIndex < punchSteps.length) {
                 timbraBtn.disabled = false;
                 timbraBtn.textContent = punchSteps[nextPunchIndex].buttonText;

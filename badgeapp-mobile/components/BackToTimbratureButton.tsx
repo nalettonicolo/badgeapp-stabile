@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { colors, radius, space } from '../lib/theme';
+import { colors, radius, space, touch } from '../lib/theme';
 
 type Props = {
   navigation: { navigate: (screen: 'Punch') => void };
@@ -30,6 +30,8 @@ export function BackToTimbratureButton({
 
 const styles = StyleSheet.create({
   btn: {
+    minHeight: touch.min,
+    justifyContent: 'center',
     backgroundColor: colors.primary,
     borderRadius: radius.lg,
     paddingVertical: space.md,

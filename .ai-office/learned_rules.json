@@ -1,0 +1,44 @@
+{
+  "versione": 1,
+  "ruoli": {
+    "role-vision-ui": [
+      {
+        "testo": "Prima di dichiarare un file modificato, controlla con `git diff --stat` che compaia davvero nel diff. Il riepilogo deve descrivere solo ciò che il diff mostra.",
+        "volte": 1,
+        "prima": "2026-11-23T16:55:16.563Z",
+        "ultima": "2026-11-23T16:55:16.563Z"
+      },
+      {
+        "testo": "Prima di rinominare un `id` esistente, cerca in tutto il progetto (HTML, script, test) se qualcuno lo usa. Se il `for`/`id` c'è già e funziona, lascialo com'è.",
+        "volte": 1,
+        "prima": "2026-11-23T16:55:16.563Z",
+        "ultima": "2026-11-23T16:55:16.563Z"
+      },
+      {
+        "testo": "Verifica sempre che il git diff non sia vuoto prima di dichiarare il lavoro completato.",
+        "volte": 1,
+        "prima": "2026-11-23T13:49:55.741Z",
+        "ultima": "2026-11-23T13:49:55.741Z"
+      },
+      {
+        "testo": "Verificare sempre lo stato attuale del file prima di dichiarare che una modifica è già presente: se il diff è vuoto, la modifica non è stata applicata.",
+        "volte": 1,
+        "prima": "2026-11-23T13:48:48.497Z",
+        "ultima": "2026-11-23T13:48:48.497Z"
+      },
+      {
+        "testo": "Quando il piano specifica modifiche precise, applicarle anche se si ritiene che siano già state fatte: il diff è la prova definitiva.",
+        "volte": 1,
+        "prima": "2026-11-23T13:48:48.497Z",
+        "ultima": "2026-11-23T13:48:48.497Z"
+      },
+      {
+        "testo": "Il riepilogo deve descrivere solo ciò che compare nel git diff: se una modifica risulta già presente nel file, scrivilo chiaramente e non elencarla tra le modifiche fatte.",
+        "volte": 1,
+        "prima": "2026-11-23T13:46:49.130Z",
+        "ultima": "2026-11-23T13:46:49.130Z"
+      }
+    ]
+  },
+  "aggiornato": "2026-11-23T16:55:16.563Z"
+}
