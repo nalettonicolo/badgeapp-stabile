@@ -1039,6 +1039,47 @@ BEGIN
 END
 $$;
 
+-- -----------------------------------------------------------------------------
+-- 16) Irrobustimento permessi segnalato dal security linter di Supabase
+--
+-- anon non ha mai bisogno di accedere a nessuna tabella app: ogni funzione
+-- dell'app richiede login. Le policy RLS già bloccavano la lettura/scrittura
+-- di dati reali, ma il GRANT a livello di tabella (ereditato dai privilegi di
+-- default di Supabase, mai revocato esplicitamente finora) rendeva comunque
+-- lo schema di queste tabelle visibile via GraphQL/PostgREST a chi non ha
+-- fatto login — revocato qui.
+--
+-- handle_new_auth_user() e log_on_behalf_of_change() sono funzioni-trigger
+-- (girano solo tramite il meccanismo di trigger, SECURITY DEFINER, mai
+-- chiamate direttamente dal client): nessun ruolo deve poterle invocare come
+-- RPC dirette (es. POST /rest/v1/rpc/handle_new_auth_user). Revocare
+-- l'esecuzione a un trigger via REVOKE ... FROM PUBLIC non impedisce al
+-- trigger stesso di girare (esegue coi privilegi del proprietario della
+-- funzione, non del ruolo che ha causato l'evento).
+--
+-- is_admin(uuid) deve restare eseguibile da authenticated (le policy RLS lo
+-- chiamano per ogni query di un utente loggato), ma non da anon.
+--
+-- Nota: "REVOKE ... FROM anon" da solo NON basta per handle_new_auth_user()/
+-- log_on_behalf_of_change(), perché quei ruoli non avevano un GRANT
+-- esplicito: ereditavano l'esecuzione dal ruolo speciale PUBLIC (riga "=X"
+-- nell'ACL). Va revocato da PUBLIC per avere effetto reale — verificato con
+-- has_function_privilege() dopo l'applicazione sul progetto reale.
+-- -----------------------------------------------------------------------------
+REVOKE ALL ON TABLE
+  public.profiles,
+  public.daily_punches,
+  public.employee_requests,
+  public.geofence_settings,
+  public.audit_log,
+  public.leave_balances,
+  public.payslip_documents
+FROM anon;
+
+REVOKE EXECUTE ON FUNCTION public.is_admin(uuid) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.handle_new_auth_user() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.log_on_behalf_of_change() FROM PUBLIC;
+
 -- =============================================================================
 -- Fine
 -- =============================================================================
